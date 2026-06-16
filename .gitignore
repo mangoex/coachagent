@@ -1,0 +1,18 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
+.env
+.venv
+venv/
+ENV/
+
+# IDEs and Editors
+.vscode/
+.idea/
+
+# Local Google credentials (do not commit)
+client_secrets.json
+service_account.json
