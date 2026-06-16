@@ -4,7 +4,7 @@ steps:
     id: 'Build Image'
     args: [
       'build',
-      '-t', 'us-central1-docker.pkg.dev/$PROJECT_ID/coachagent-repo/coachagent-service:$COMMIT_SHA',
+      '-t', 'us-central1-docker.pkg.dev/$PROJECT_ID/coachagent-repo/coachagent-service:$BUILD_ID',
       '-t', 'us-central1-docker.pkg.dev/$PROJECT_ID/coachagent-repo/coachagent-service:latest',
       '.'
     ]
@@ -25,7 +25,7 @@ steps:
     entrypoint: 'gcloud'
     args: [
       'run', 'deploy', 'coachagent-service',
-      '--image', 'us-central1-docker.pkg.dev/$PROJECT_ID/coachagent-repo/coachagent-service:$COMMIT_SHA',
+      '--image', 'us-central1-docker.pkg.dev/$PROJECT_ID/coachagent-repo/coachagent-service:$BUILD_ID',
       '--region', 'us-central1',
       '--platform', 'managed',
       '--allow-unauthenticated',
@@ -35,7 +35,7 @@ steps:
     ]
 
 images:
-  - 'us-central1-docker.pkg.dev/$PROJECT_ID/coachagent-repo/coachagent-service:$COMMIT_SHA'
+  - 'us-central1-docker.pkg.dev/$PROJECT_ID/coachagent-repo/coachagent-service:$BUILD_ID'
   - 'us-central1-docker.pkg.dev/$PROJECT_ID/coachagent-repo/coachagent-service:latest'
 
 options:
