@@ -74,6 +74,11 @@ class GeminiAgent:
         """
         Defines the local python functions as Vertex AI tools.
         """
+        def _check_auth() -> Optional[str]:
+            if not self.refresh_token:
+                return "ERROR CRÍTICO: El usuario no ha vinculado su cuenta de Google Workspace. DEBES responder diciéndole al usuario que vaya al panel web (la aplicación) y conecte su cuenta de Google Workspace desde la sección de 'Configuración' antes de poder usar el calendario o Google Docs."
+            return None
+
         def list_calendar_events(date_str: str = "") -> str:
             """
             List calendar events for a specific day.
@@ -81,6 +86,8 @@ class GeminiAgent:
             Args:
                 date_str: Date in 'YYYY-MM-DD' format. If empty, defaults to today.
             """
+            auth_err = _check_auth()
+            if auth_err: return auth_err
             try:
                 events = GoogleCalendarService.list_events(self.refresh_token, date_str)
                 return json.dumps(events, ensure_ascii=False)
@@ -104,6 +111,8 @@ class GeminiAgent:
                 attendees_csv: Comma-separated email addresses of attendees.
                 description: Description of the meeting.
             """
+            auth_err = _check_auth()
+            if auth_err: return auth_err
             try:
                 attendees_list = [a.strip() for a in attendees_csv.split(",")] if attendees_csv else None
                 event = GoogleCalendarService.create_event(
@@ -132,6 +141,8 @@ class GeminiAgent:
                 attendees_csv: Comma-separated list of attendee emails.
                 description: New description.
             """
+            auth_err = _check_auth()
+            if auth_err: return auth_err
             try:
                 attendees_list = [a.strip() for a in attendees_csv.split(",")] if attendees_csv else None
                 event = GoogleCalendarService.update_event(
@@ -148,6 +159,8 @@ class GeminiAgent:
             Args:
                 event_id: The ID of the event to delete.
             """
+            auth_err = _check_auth()
+            if auth_err: return auth_err
             try:
                 success = GoogleCalendarService.delete_event(self.refresh_token, event_id)
                 return "Event deleted successfully." if success else "Failed to delete event."
@@ -158,8 +171,10 @@ class GeminiAgent:
             """
             Read client list, products, and prices from the spreadsheet CRM.
             """
+            auth_err = _check_auth()
+            if auth_err: return auth_err
             if not self.spreadsheet_id:
-                return "Error: No CRM spreadsheet ID configured for this user."
+                return "Error: No CRM spreadsheet ID configured for this user. Pídele al usuario que agregue el ID del documento en la configuración de la app."
             try:
                 data = GoogleSheetsService.read_crm_data(self.refresh_token, self.spreadsheet_id)
                 return json.dumps(data, ensure_ascii=False)
@@ -177,8 +192,10 @@ class GeminiAgent:
                 price: Unit price.
                 discount: Discount percentage (e.g. 10.0 for 10% discount).
             """
+            auth_err = _check_auth()
+            if auth_err: return auth_err
             if not self.template_doc_id:
-                return "Error: No template document ID configured for this user."
+                return "Error: No template document ID configured for this user. Pídele al usuario que agregue el ID de la plantilla en la configuración."
             try:
                 total = (price * quantity) * (1 - (discount / 100))
                 replacements = {
