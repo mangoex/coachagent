@@ -110,6 +110,11 @@ class ChatRequest(BaseModel):
     phone_number: str
     message: str
 
+class SellerUpdate(BaseModel):
+    name: Optional[str] = None
+    phone_number: Optional[str] = None
+    sales_goals: Optional[str] = None
+
 # Setup OAuth Flow helper
 SCOPES = [
     'https://www.googleapis.com/auth/calendar',
@@ -249,15 +254,31 @@ def list_users(db: Session = Depends(get_db)):
 def get_seller_profile(email: str, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == email).first()
     if not user:
-        raise HTTPException(status_code=404, detail="Vendedor no encontrado.")
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
     return {
         "name": user.name,
-        "email": user.email,
         "phone_number": user.phone_number,
+        "role": user.role,
         "sales_goals": user.sales_goals,
-        "objectives": user.objectives,
-        "is_google_connected": bool(user.encrypted_refresh_token)
+        "is_google_connected": user.encrypted_refresh_token is not None and user.encrypted_refresh_token != ""
     }
+
+@app.put("/seller/{email}")
+def update_seller_profile(email: str, payload: SellerUpdate, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    if payload.name is not None:
+        user.name = payload.name
+    if payload.phone_number is not None:
+        user.phone_number = payload.phone_number
+    if payload.sales_goals is not None:
+        user.sales_goals = payload.sales_goals
+        
+    db.commit()
+    return {"detail": "Perfil actualizado exitosamente"}
 
 @app.get("/auth/google/url")
 def get_google_auth_url(email: str, request: Request):

@@ -540,7 +540,7 @@
 
                     <div class="form-group">
                         <label>Número de WhatsApp (Identificador del Agente)</label>
-                        <input type="text" id="set_phone" readonly style="opacity:0.7; cursor:not-allowed;">
+                        <input type="text" id="set_phone" placeholder="Ej. 526672013019">
                     </div>
                     
                     <div class="form-group">
@@ -783,9 +783,42 @@
             chatMsgs.scrollTop = chatMsgs.scrollHeight;
         }
 
-        function saveSettings() {
-            // Future placeholder to save profile
-            showAlert('settingsAlert', '¡Funcionalidad de actualización en desarrollo!', true);
+        async function saveSettings() {
+            if(!window.currentUser) return;
+            const btn = document.querySelector('#view-settings .btn');
+            btn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Guardando...';
+            btn.disabled = true;
+
+            const payload = {
+                name: document.getElementById('set_name').value,
+                phone_number: document.getElementById('set_phone').value,
+                sales_goals: document.getElementById('set_goals').value
+            };
+
+            try {
+                const res = await fetch(`/seller/${window.currentUser.email}`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                
+                if(res.ok) {
+                    showAlert('settingsAlert', '¡Perfil actualizado exitosamente!', true);
+                    // Actualizar el teléfono en los datos cacheados
+                    if(window.sellerData) {
+                        window.sellerData.name = payload.name;
+                        window.sellerData.phone_number = payload.phone_number;
+                        window.sellerData.sales_goals = payload.sales_goals;
+                    }
+                } else {
+                    showAlert('settingsAlert', 'Error al guardar los cambios.', false);
+                }
+            } catch(e) {
+                showAlert('settingsAlert', 'Error de conexión', false);
+            }
+            
+            btn.innerHTML = '<i class="ph ph-floppy-disk"></i> Guardar Cambios';
+            btn.disabled = false;
             setTimeout(() => { document.getElementById('settingsAlert').style.display='none'; }, 3000);
         }
 
