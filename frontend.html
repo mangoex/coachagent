@@ -55,9 +55,13 @@
                 window.currentUser = { 
                     email: result.user.email, 
                     uid: result.user.uid,
-                    refreshToken: prompt("Firebase no devuelve Refresh Token directamente. Pega tu Refresh Token generado en OAuth Playground:") || "mock_token"
+                    refreshToken: ""
                 };
                 document.getElementById("user-status").textContent = `Autenticado: ${result.user.email}`;
+                
+                // Fetch dashboard data
+                loadDashboard(result.user.email);
+                showTab('dashboard');
                 return window.currentUser;
             } catch (error) {
                 console.error("Error en Firebase Login:", error);
@@ -128,7 +132,8 @@
     <main>
         <div class="tabs">
             <button class="tab-btn active" onclick="showTab('empresa')">Soy Empresa</button>
-            <button class="tab-btn" onclick="showTab('vendedor')">Soy Vendedor</button>
+            <button class="tab-btn" onclick="showTab('vendedor')">Registro Vendedor</button>
+            <button class="tab-btn" onclick="showTab('dashboard')">Mi Panel</button>
             <button class="tab-btn" onclick="showTab('chat')">Playground</button>
         </div>
 
@@ -153,7 +158,7 @@
 
         <!-- PANEL VENDEDOR -->
         <div id="panel-vendedor" class="panel">
-            <h2>Acceso Vendedor</h2>
+            <h2>Registro de Vendedor</h2>
             <div class="auth-bar">
                 <span>Inicia sesión primero para obtener tu UID y Token:</span>
                 <button class="btn" style="width:auto; margin:0;" onclick="window.firebaseLogin()">Autenticarse con Google</button>
@@ -181,6 +186,32 @@
                 <button class="btn" onclick="registerIndependent()">Registrarme como Independiente</button>
             </div>
             <div id="sellerAlert" class="alert"></div>
+        </div>
+
+        <!-- PANEL DASHBOARD -->
+        <div id="panel-dashboard" class="panel">
+            <h2>Panel del Vendedor</h2>
+            <div id="dashboard-content" style="display:none;">
+                <div class="form-group" style="background:rgba(255,255,255,0.05); padding:20px; border-radius:15px;">
+                    <h3 style="color:var(--accent); margin-bottom:10px;">Información General</h3>
+                    <p><strong>Nombre:</strong> <span id="dash_name"></span></p>
+                    <p><strong>Teléfono:</strong> <span id="dash_phone"></span></p>
+                    <p><strong>Metas de Venta:</strong> <span id="dash_goals"></span></p>
+                    <p><strong>Objetivos:</strong> <span id="dash_objectives"></span></p>
+                </div>
+
+                <div class="form-group" style="background:rgba(255,255,255,0.05); padding:20px; border-radius:15px; margin-top:20px;">
+                    <h3 style="color:var(--accent); margin-bottom:10px;">Integración de Inteligencia Artificial</h3>
+                    <p style="margin-bottom:15px; color:var(--text-muted);">
+                        Para que el Sales Coach pueda leer tu calendario, agendar reuniones y armar cotizaciones en Google Docs, debes darle permiso conectando tu cuenta.
+                    </p>
+                    <div id="dash_google_status" style="margin-bottom:15px; font-weight:bold;"></div>
+                    <button id="btn_connect_google" class="btn" onclick="connectGoogleWorkspace()">Conectar Google Workspace</button>
+                </div>
+            </div>
+            <div id="dashboard-login-msg">
+                <p>Inicia sesión primero o regístrate para ver tu panel.</p>
+            </div>
         </div>
 
         <!-- PANEL CHAT -->
@@ -301,6 +332,54 @@
             const data = await res.json();
             chatMsgs.innerHTML += `<div class="message agent">${data.reply || data.detail}</div>`;
             chatMsgs.scrollTop = chatMsgs.scrollHeight;
+        }
+
+        async function loadDashboard(email) {
+            try {
+                const res = await fetch(`/seller/${email}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    document.getElementById('dashboard-login-msg').style.display = 'none';
+                    document.getElementById('dashboard-content').style.display = 'block';
+                    
+                    document.getElementById('dash_name').textContent = data.name || '-';
+                    document.getElementById('dash_phone').textContent = data.phone_number || '-';
+                    document.getElementById('dash_goals').textContent = data.sales_goals || 'No definidas';
+                    document.getElementById('dash_objectives').textContent = data.objectives || 'No definidos';
+                    
+                    const statusEl = document.getElementById('dash_google_status');
+                    const btnEl = document.getElementById('btn_connect_google');
+                    
+                    if (data.is_google_connected) {
+                        statusEl.innerHTML = '<span style="color:#4caf50;">✅ Conectado a Google Workspace</span>';
+                        btnEl.textContent = "Volver a Conectar / Renovar Permisos";
+                        btnEl.style.background = "#333";
+                    } else {
+                        statusEl.innerHTML = '<span style="color:#f44336;">❌ No conectado</span>';
+                        btnEl.textContent = "Conectar Google Workspace";
+                        btnEl.style.background = "var(--primary)";
+                    }
+                }
+            } catch (e) {
+                console.error("Error loading dashboard", e);
+            }
+        }
+
+        async function connectGoogleWorkspace() {
+            if (!window.currentUser) return alert("Debes iniciar sesión primero.");
+            try {
+                const res = await fetch(`/auth/google/url?email=${window.currentUser.email}`);
+                const data = await res.json();
+                if(data.url) {
+                    window.open(data.url, '_blank', 'width=600,height=700');
+                    // Automatically reload dashboard after a delay to check if they connected
+                    setTimeout(() => loadDashboard(window.currentUser.email), 15000);
+                } else {
+                    alert("Error al generar URL de conexión.");
+                }
+            } catch (e) {
+                alert("Hubo un error de conexión.");
+            }
         }
     </script>
 </body>
