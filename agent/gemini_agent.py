@@ -250,7 +250,12 @@ class GeminiAgent:
                 contents.append(Content(role="user", parts=tool_responses))
                 response = self.model.generate_content(contents)
 
-            final_reply = response.text if response.text else "Entendido."
+            try:
+                final_reply = response.text
+                if not final_reply:
+                    final_reply = "Entendido."
+            except ValueError:
+                final_reply = "¡Listo! He procesado tu solicitud."
             
             # Map contents back to basic history format
             updated_history = []
