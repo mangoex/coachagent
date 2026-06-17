@@ -29,6 +29,7 @@ steps:
       '--region', 'us-central1',
       '--platform', 'managed',
       '--allow-unauthenticated',
+      '--add-cloudsql-instances', '$PROJECT_ID:us-central1:coachagent-postgres',
       '--set-env-vars', 'ENVIRONMENT=production,GCP_PROJECT_ID=$PROJECT_ID,GCP_LOCATION=us-central1',
       # Link secrets from GCP Secret Manager directly into Cloud Run container environment variables
       '--set-secrets', 'DATABASE_URL=COACHAGENT_DATABASE_URL:latest,ENCRYPTION_KEY=COACHAGENT_ENCRYPTION_KEY:latest,REDIS_URL=COACHAGENT_REDIS_URL:latest,WHATSAPP_TOKEN=COACHAGENT_WHATSAPP_TOKEN:latest,WHATSAPP_PHONE_NUMBER_ID=COACHAGENT_WHATSAPP_PHONE_NUMBER_ID:latest,WHATSAPP_VERIFY_TOKEN=COACHAGENT_WHATSAPP_VERIFY_TOKEN:latest,GCS_BUCKET_NAME=COACHAGENT_GCS_BUCKET_NAME:latest,GOOGLE_CLIENT_ID=COACHAGENT_GOOGLE_CLIENT_ID:latest,GOOGLE_CLIENT_SECRET=COACHAGENT_GOOGLE_CLIENT_SECRET:latest'

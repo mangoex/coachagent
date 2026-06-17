@@ -5,7 +5,7 @@ from typing import List, Dict, Any, Tuple, Optional
 # Attempt to import vertexai; provide a fallback if it fails or is not authenticated
 try:
     import vertexai
-    from vertexai.generative_models import GenerativeModel, Tool, Part, Content
+    from vertexai.generative_models import GenerativeModel, Tool, Part, Content, FunctionDeclaration
     VERTEX_AVAILABLE = True
 except ImportError:
     VERTEX_AVAILABLE = False
@@ -187,7 +187,8 @@ class GeminiAgent:
             "read_crm_data": read_crm_data,
             "generate_quotation": generate_quotation
         }
-        self.tools_list = Tool.from_py_funcs(list(self.tools_map.values()))
+        declarations = [FunctionDeclaration.from_func(func) for func in self.tools_map.values()]
+        self.tools_list = Tool(function_declarations=declarations)
 
     def run(self, history: List[Dict[str, str]], user_message: str) -> Tuple[str, List[Dict[str, str]]]:
         """

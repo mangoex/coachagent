@@ -16,3 +16,6 @@ ENV/
 # Local Google credentials (do not commit)
 client_secrets.json
 service_account.json
+
+# Spec-kit
+spec-kit/
