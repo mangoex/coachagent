@@ -116,10 +116,16 @@ class GeminiAgent:
             try:
                 attendees_list = [a.strip() for a in attendees_csv.split(",")] if attendees_csv else None
                 event = GoogleCalendarService.create_event(
-                    self.refresh_token, summary, start_time_iso, end_time_iso, attendees_list, description
+                    refresh_token=self.refresh_token,
+                    summary=summary,
+                    start_time_iso=start_time_iso,
+                    end_time_iso=end_time_iso,
+                    attendees=attendees_list,
+                    description=description
                 )
-                return json.dumps(event, ensure_ascii=False)
+                return f"Event created: {event.get('htmlLink')}"
             except Exception as e:
+                logger.error(f"Failed to create event: {str(e)}")
                 return f"Error creating event: {str(e)}"
 
         def update_calendar_event(

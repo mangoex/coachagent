@@ -69,8 +69,8 @@ class GoogleCalendarService:
         event_body = {
             "summary": summary,
             "description": description or "Creado por Google AI Sales Coach Agent",
-            "start": {"dateTime": start_time_iso, "timeZone": "UTC"},
-            "end": {"dateTime": end_time_iso, "timeZone": "UTC"},
+            "start": {"dateTime": start_time_iso, "timeZone": "America/Mexico_City"},
+            "end": {"dateTime": end_time_iso, "timeZone": "America/Mexico_City"},
         }
         
         if attendees:
