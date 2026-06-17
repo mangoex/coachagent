@@ -62,7 +62,8 @@ def startup_event():
                 "ALTER TABLE users ADD COLUMN role VARCHAR DEFAULT 'vendedor_independiente';",
                 "ALTER TABLE users ADD COLUMN company_id INTEGER REFERENCES companies(id) ON DELETE SET NULL;",
                 "ALTER TABLE users ADD COLUMN sales_goals TEXT;",
-                "ALTER TABLE users ADD COLUMN objectives TEXT;"
+                "ALTER TABLE users ADD COLUMN objectives TEXT;",
+                "ALTER TABLE users ADD COLUMN calendar_id VARCHAR DEFAULT 'primary';"
             ]
             for query in migrations:
                 try:
@@ -213,6 +214,36 @@ def register_independent(payload: SellerIndependent, db: Session = Depends(get_d
     db.commit()
     return {"detail": "Vendedor independiente registrado", "phone_number": new_user.phone_number}
 
+class CalendarUpdate(BaseModel):
+    calendar_id: str
+
+@app.get("/api/calendars")
+def get_calendars(email: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    refresh_token = user.get_refresh_token()
+    if not refresh_token:
+        raise HTTPException(status_code=400, detail="Google no conectado")
+    
+    try:
+        calendars = GoogleCalendarService.list_calendars(refresh_token)
+        return {"calendars": calendars, "selected": user.calendar_id}
+    except Exception as e:
+        logger.error(f"Error listing calendars: {e}")
+        raise HTTPException(status_code=500, detail="Error de Google Calendar")
+
+@app.post("/api/settings/calendar")
+def update_calendar(email: str, payload: CalendarUpdate, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    user.calendar_id = payload.calendar_id
+    db.commit()
+    return {"detail": "Calendario actualizado", "calendar_id": user.calendar_id}
+
 @app.post("/agent/chat")
 def agent_chat(payload: ChatRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.phone_number == payload.phone_number).first()
@@ -231,7 +262,8 @@ def agent_chat(payload: ChatRequest, db: Session = Depends(get_db)):
         spreadsheet_id=user.spreadsheet_id,
         template_doc_id=user.template_doc_id,
         sales_goals=user.sales_goals,
-        objectives=user.objectives
+        objectives=user.objectives,
+        calendar_id=user.calendar_id
     )
 
     reply, updated_history = agent.run(chat_history, payload.message)

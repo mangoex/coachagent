@@ -24,12 +24,13 @@ class GeminiAgent:
     Orchestrates Gemini tool calling and reasoning with Vertex AI.
     If Vertex AI is not initialized or fails, falls back to a simulated mock agent.
     """
-    def __init__(self, user_refresh_token: str, spreadsheet_id: Optional[str] = None, template_doc_id: Optional[str] = None, sales_goals: Optional[str] = None, objectives: Optional[str] = None):
+    def __init__(self, user_refresh_token: str, spreadsheet_id: Optional[str] = None, template_doc_id: Optional[str] = None, sales_goals: Optional[str] = None, objectives: Optional[str] = None, calendar_id: str = "primary"):
         self.refresh_token = user_refresh_token
         self.spreadsheet_id = spreadsheet_id
         self.template_doc_id = template_doc_id
         self.sales_goals = sales_goals
         self.objectives = objectives
+        self.calendar_id = calendar_id
         self.vertex_initialized = False
 
         if VERTEX_AVAILABLE:
@@ -89,7 +90,7 @@ class GeminiAgent:
             auth_err = _check_auth()
             if auth_err: return auth_err
             try:
-                events = GoogleCalendarService.list_events(self.refresh_token, date_str)
+                events = GoogleCalendarService.list_events(self.refresh_token, date_str, self.calendar_id)
                 return json.dumps(events, ensure_ascii=False)
             except Exception as e:
                 logger.error(f"Failed to list events: {str(e)}")
@@ -122,7 +123,8 @@ class GeminiAgent:
                     start_time_iso=start_time_iso,
                     end_time_iso=end_time_iso,
                     attendees=attendees_list,
-                    description=description
+                    description=description,
+                    calendar_id=self.calendar_id
                 )
                 return f"Event created: {event.get('htmlLink')}"
             except Exception as e:
@@ -153,7 +155,7 @@ class GeminiAgent:
             try:
                 attendees_list = [a.strip() for a in attendees_csv.split(",")] if attendees_csv else None
                 event = GoogleCalendarService.update_event(
-                    self.refresh_token, event_id, summary or None, start_time_iso or None, end_time_iso or None, attendees_list, description or None
+                    self.refresh_token, event_id, summary or None, start_time_iso or None, end_time_iso or None, attendees_list, description or None, self.calendar_id
                 )
                 return json.dumps(event, ensure_ascii=False)
             except Exception as e:
@@ -169,7 +171,7 @@ class GeminiAgent:
             auth_err = _check_auth()
             if auth_err: return auth_err
             try:
-                success = GoogleCalendarService.delete_event(self.refresh_token, event_id)
+                success = GoogleCalendarService.delete_event(self.refresh_token, event_id, self.calendar_id)
                 return "Event deleted successfully." if success else "Failed to delete event."
             except Exception as e:
                 return f"Error deleting event: {str(e)}"

@@ -8,9 +8,16 @@ class GoogleCalendarService:
     def _get_calendar_client(refresh_token: str):
         creds = get_user_credentials(refresh_token)
         return build("calendar", "v3", credentials=creds)
-
     @classmethod
-    def list_events(cls, refresh_token: str, date_str: Optional[str] = None) -> List[Dict[str, Any]]:
+    def list_calendars(cls, refresh_token: str) -> List[Dict[str, str]]:
+        """
+        List all calendars available to the user.
+        """
+        service = cls._get_calendar_client(refresh_token)
+        calendars_result = service.calendarList().list().execute()
+        return [{"id": c.get("id"), "summary": c.get("summary")} for c in calendars_result.get("items", [])]
+    @classmethod
+    def list_events(cls, refresh_token: str, date_str: Optional[str] = None, calendar_id: str = "primary") -> List[Dict[str, Any]]:
         """
         List events for a specific day.
         :param date_str: String format 'YYYY-MM-DD'. If None, defaults to today.
@@ -27,7 +34,7 @@ class GoogleCalendarService:
         time_max = f"{target_date.isoformat()}T23:59:59Z"
 
         events_result = service.events().list(
-            calendarId="primary",
+            calendarId=calendar_id,
             timeMin=time_min,
             timeMax=time_max,
             singleEvents=True,
@@ -57,7 +64,8 @@ class GoogleCalendarService:
         start_time_iso: str, 
         end_time_iso: str, 
         attendees: Optional[List[str]] = None,
-        description: Optional[str] = None
+        description: Optional[str] = None,
+        calendar_id: str = "primary"
     ) -> Dict[str, Any]:
         """
         Create a new event in Google Calendar.
@@ -77,7 +85,7 @@ class GoogleCalendarService:
             event_body["attendees"] = [{"email": email} for email in attendees]
 
         created_event = service.events().insert(
-            calendarId="primary",
+            calendarId=calendar_id,
             body=event_body,
             sendUpdates="all"
         ).execute()
@@ -99,7 +107,8 @@ class GoogleCalendarService:
         start_time_iso: Optional[str] = None, 
         end_time_iso: Optional[str] = None,
         attendees: Optional[List[str]] = None,
-        description: Optional[str] = None
+        description: Optional[str] = None,
+        calendar_id: str = "primary"
     ) -> Dict[str, Any]:
         """
         Update an existing event.
@@ -107,7 +116,7 @@ class GoogleCalendarService:
         service = cls._get_calendar_client(refresh_token)
         
         # Get existing event first to merge updates
-        event = service.events().get(calendarId="primary", eventId=event_id).execute()
+        event = service.events().get(calendarId=calendar_id, eventId=event_id).execute()
 
         if summary is not None:
             event["summary"] = summary
@@ -121,7 +130,7 @@ class GoogleCalendarService:
             event["attendees"] = [{"email": email} for email in attendees]
 
         updated_event = service.events().update(
-            calendarId="primary",
+            calendarId=calendar_id,
             eventId=event_id,
             body=event,
             sendUpdates="all"
@@ -135,10 +144,10 @@ class GoogleCalendarService:
         }
 
     @classmethod
-    def delete_event(cls, refresh_token: str, event_id: str) -> bool:
+    def delete_event(cls, refresh_token: str, event_id: str, calendar_id: str = "primary") -> bool:
         """
-        Delete an event from primary calendar.
+        Delete an event from calendar.
         """
         service = cls._get_calendar_client(refresh_token)
-        service.events().delete(calendarId="primary", eventId=event_id).execute()
+        service.events().delete(calendarId=calendar_id, eventId=event_id).execute()
         return True

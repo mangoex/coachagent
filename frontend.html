@@ -619,6 +619,19 @@
                         <label>Metas de Ventas</label>
                         <input type="text" id="set_goals" placeholder="Tus metas u objetivos de ventas actuales">
                     </div>
+                    
+                    <div class="form-group">
+                        <label>Calendario Principal</label>
+                        <div style="display:flex; gap:10px;">
+                            <select id="set_calendar" style="flex:1;">
+                                <option value="primary">primary (Predeterminado)</option>
+                            </select>
+                            <button class="btn btn-outline" onclick="loadCalendars()" title="Recargar Calendarios" id="btn_reload_cals">
+                                <i class="ph ph-arrows-clockwise"></i>
+                            </button>
+                        </div>
+                        <p style="font-size:11px; color:var(--text-muted); margin-top:4px;">Selecciona en qué calendario el Agente guardará y leerá tus eventos.</p>
+                    </div>
 
                     <button class="btn" style="margin-top: 10px;" onclick="saveSettings()"><i class="ph ph-floppy-disk"></i> Guardar Cambios</button>
                     <div id="settingsAlert" class="alert" style="margin-top: 15px;"></div>
@@ -654,6 +667,10 @@
             // Close sidebar on mobile after clicking
             document.getElementById('sidebar').classList.remove('open');
             document.getElementById('sidebarOverlay').classList.remove('open');
+            
+            if (view === 'settings') {
+                loadCalendars();
+            }
         }
 
         function toggleSidebar() {
@@ -884,6 +901,16 @@
                     body: JSON.stringify(payload)
                 });
                 
+                // Save Calendar setting independently if modified
+                const selectedCal = document.getElementById('set_calendar').value;
+                if (selectedCal) {
+                    await fetch('/api/settings/calendar?email=' + encodeURIComponent(window.currentUser.email), {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ calendar_id: selectedCal })
+                    });
+                }
+                
                 if(res.ok) {
                     showAlert('settingsAlert', '¡Perfil actualizado exitosamente!', true);
                     // Actualizar el teléfono en los datos cacheados
@@ -902,6 +929,31 @@
             btn.innerHTML = '<i class="ph ph-floppy-disk"></i> Guardar Cambios';
             btn.disabled = false;
             setTimeout(() => { document.getElementById('settingsAlert').style.display='none'; }, 3000);
+        }
+
+        async function loadCalendars() {
+            if(!window.currentUser) return;
+            const btn = document.getElementById('btn_reload_cals');
+            if(btn) btn.innerHTML = '<i class="ph ph-spinner ph-spin"></i>';
+            
+            try {
+                const res = await fetch('/api/calendars?email=' + encodeURIComponent(window.currentUser.email));
+                if(res.ok) {
+                    const data = await res.json();
+                    const select = document.getElementById('set_calendar');
+                    select.innerHTML = '';
+                    data.calendars.forEach(c => {
+                        const opt = document.createElement('option');
+                        opt.value = c.id;
+                        opt.textContent = c.summary;
+                        if(c.id === data.selected) opt.selected = true;
+                        select.appendChild(opt);
+                    });
+                }
+            } catch(e) {
+                console.error("Error loading calendars", e);
+            }
+            if(btn) btn.innerHTML = '<i class="ph ph-arrows-clockwise"></i>';
         }
 
     </script>

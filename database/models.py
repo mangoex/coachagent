@@ -38,6 +38,7 @@ class User(Base):
     # Associated Workspace resources
     spreadsheet_id = Column(String, nullable=True)  # CRM Sheet ID
     template_doc_id = Column(String, nullable=True)  # Quote Template Doc ID
+    calendar_id = Column(String, default="primary") # Selected Calendar ID
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

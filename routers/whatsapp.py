@@ -157,7 +157,10 @@ async def receive_message(request: Request, db: Session = Depends(get_db)):
     agent = GeminiAgent(
         user_refresh_token=refresh_token,
         spreadsheet_id=user.spreadsheet_id,
-        template_doc_id=user.template_doc_id
+        template_doc_id=user.template_doc_id,
+        sales_goals=user.sales_goals,
+        objectives=user.objectives,
+        calendar_id=user.calendar_id
     )
 
     # Run agent cycle (includes tool executions)
