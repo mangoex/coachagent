@@ -1,6 +1,8 @@
 import json
 import logging
 from typing import List, Dict, Any, Tuple, Optional
+from datetime import datetime
+import pytz
 
 # Attempt to import vertexai; provide a fallback if it fails or is not authenticated
 try:
@@ -42,8 +44,14 @@ class GeminiAgent:
                     "Tienes acceso a herramientas de Google Workspace (Calendar, Sheets, Docs).\n"
                     "Cuando se te solicite leer el CRM o ver los clientes/productos/precios, lee el CRM en Google Sheets.\n"
                     "Cuando se apruebe una cotización, usa la herramienta generate_quotation para generar la propuesta y devuélvele al vendedor el enlace firmado del PDF resultante.\n"
-                    "Mantén un tono profesional, motivador, conciso y enfocado a objetivos comerciales. Responde en español."
+                    "Mantén un tono profesional, motivador, conciso y enfocado a objetivos comerciales. Responde en español.\n"
                 )
+                
+                # Inyectar fecha y hora actual para evitar alucinaciones
+                tz = pytz.timezone('America/Mexico_City')
+                now = datetime.now(tz)
+                self.system_instruction += f"\n[Contexto del Sistema]\nHoy es: {now.strftime('%A, %d de %B de %Y')}.\nLa hora actual es: {now.strftime('%H:%M %Z')}.\n"
+                self.system_instruction += "Toma en cuenta esta fecha y hora para todas tus acciones (por ejemplo, 'mañana a las 7am' o 'hoy a las 6pm'). Las fechas en las herramientas deben ir en formato ISO 8601.\n"
                 
                 if self.sales_goals:
                     self.system_instruction += f"\nMeta de Ventas del vendedor: {self.sales_goals}"

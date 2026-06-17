@@ -30,6 +30,19 @@
             provider.addScope('https://www.googleapis.com/auth/calendar');
             provider.addScope('https://www.googleapis.com/auth/spreadsheets');
             provider.addScope('https://www.googleapis.com/auth/drive');
+
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    window.currentUser = { email: user.email, uid: user.uid, refreshToken: "" };
+                    document.getElementById("user-status").textContent = `Autenticado: ${user.email}`;
+                    loadDashboard(user.email);
+                } else {
+                    window.currentUser = null;
+                    document.getElementById("user-status").textContent = "No Autenticado";
+                    document.getElementById('dashboard-login-msg').innerHTML = '<p>Inicia sesión primero o regístrate para ver tu panel.</p>';
+                    document.getElementById('dashboard-content').style.display = 'none';
+                }
+            });
         } catch(e) {
             console.warn("Firebase no está configurado aún. Operando en modo desarrollo/mock.");
         }
@@ -364,6 +377,15 @@
                         btnEl.textContent = "Conectar Google Workspace";
                         btnEl.style.background = "var(--primary)";
                     }
+                } else if (res.status === 404) {
+                    document.getElementById('dashboard-content').style.display = 'none';
+                    document.getElementById('dashboard-login-msg').style.display = 'block';
+                    document.getElementById('dashboard-login-msg').innerHTML = `
+                        <p style="color:var(--accent); font-weight:bold; margin-bottom:15px;">¡Casi listo!</p>
+                        <p>Estás autenticado como ${email}, pero aún no has registrado tu perfil de vendedor en nuestra base de datos.</p>
+                        <p style="margin-top:10px;">Por favor, ve a la pestaña <strong>"Registro Vendedor"</strong>, llena tus datos y regístrate para activar tu panel.</p>
+                        <button class="btn" style="width:200px;" onclick="showTab('vendedor')">Ir a Registro</button>
+                    `;
                 }
             } catch (e) {
                 console.error("Error loading dashboard", e);
