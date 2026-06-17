@@ -236,10 +236,11 @@
         .sidebar-header {
             padding: 24px;
             border-bottom: 1px solid var(--card-border);
-            display: flex; align-items: center; gap: 12px;
+            display: flex; align-items: center; justify-content: space-between; gap: 12px;
         }
         .sidebar-header i { font-size: 28px; color: var(--accent); }
-        .logo-text { font-family: 'Space Grotesk', sans-serif; font-size: 20px; font-weight: 700; color: #fff; line-height: 1.2; }
+        .logo-text { font-family: 'Space Grotesk', sans-serif; font-size: 20px; font-weight: 700; color: #fff; line-height: 1.2; display: flex; align-items: center; gap: 8px;}
+        .mobile-close-btn { display: none; background: transparent; border: none; color: #fff; font-size: 24px; cursor: pointer; }
 
         .nav-menu { flex: 1; padding: 20px 15px; display: flex; flex-direction: column; gap: 8px; }
         .nav-item {
@@ -341,6 +342,65 @@
         }
         .btn-send:hover { background: var(--primary-hover); transform: scale(1.05); }
 
+        /* MOBILE STYLES */
+        .mobile-header {
+            display: none;
+            padding: 15px 20px;
+            background: var(--bg-color);
+            border-bottom: 1px solid var(--card-border);
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+        
+        .mobile-menu-btn {
+            background: none;
+            border: none;
+            color: var(--text-main);
+            font-size: 28px;
+            cursor: pointer;
+        }
+
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 99;
+            backdrop-filter: blur(2px);
+        }
+
+        @media (max-width: 768px) {
+            #screen-app { flex-direction: column; overflow: hidden; }
+            
+            /* Sidebar as a drawer */
+            aside {
+                position: fixed;
+                left: -100%;
+                top: 0;
+                height: 100%;
+                z-index: 100;
+                transition: 0.3s ease-in-out;
+                box-shadow: 5px 0 15px rgba(0,0,0,0.5);
+                background: #0f0c20; /* Solid bg on mobile */
+            }
+            aside.open { left: 0; }
+            
+            .mobile-close-btn { display: block; }
+            .sidebar-overlay.open { display: block; }
+            .mobile-header { display: flex; }
+            
+            .main-wrapper { flex: 1; display: flex; flex-direction: column; width: 100%; height: 100%; overflow: hidden; }
+            main.content-area { padding: 20px; flex: 1; overflow-y: auto; }
+            
+            .page-header h2 { font-size: 24px; }
+            .chat-container { height: calc(100vh - 160px); }
+            .message-row { max-width: 95%; }
+            .auth-card { padding: 30px 20px; }
+        }
+
     </style>
 </head>
 <body>
@@ -393,10 +453,15 @@
 
     <!-- SCREEN: MAIN APP -->
     <div id="screen-app" class="hidden">
-        <aside>
+        <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+        
+        <aside id="sidebar">
             <div class="sidebar-header">
-                <i class="ph-fill ph-robot"></i>
-                <div class="logo-text">Sales Coach</div>
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <i class="ph-fill ph-robot"></i>
+                    <div class="logo-text">Sales Coach</div>
+                </div>
+                <button class="mobile-close-btn" onclick="toggleSidebar()"><i class="ph ph-x"></i></button>
             </div>
             <nav class="nav-menu">
                 <a class="nav-item active" onclick="showAppView('dashboard')" id="nav-dashboard">
@@ -423,9 +488,16 @@
             </div>
         </aside>
 
-        <main class="content-area">
+        <div class="main-wrapper" style="flex:1; display:flex; flex-direction:column; width:100%; height:100%;">
+            <!-- Mobile Header -->
+            <div class="mobile-header">
+                <div class="logo-text" style="font-size: 18px;"><i class="ph-fill ph-robot" style="color:var(--accent)"></i> Sales Coach</div>
+                <button class="mobile-menu-btn" onclick="toggleSidebar()"><i class="ph ph-list"></i></button>
+            </div>
             
-            <!-- VIEW: DASHBOARD -->
+            <main class="content-area">
+                
+                <!-- VIEW: DASHBOARD -->
             <div id="view-dashboard" class="view-panel active">
                 <div class="page-header">
                     <div>
@@ -554,6 +626,7 @@
             </div>
 
         </main>
+        </div>
     </div>
 
     <!-- LOGIC -->
@@ -577,6 +650,15 @@
             
             const btn = document.getElementById(`nav-${view}`);
             if (btn) btn.classList.add('active');
+            
+            // Close sidebar on mobile after clicking
+            document.getElementById('sidebar').classList.remove('open');
+            document.getElementById('sidebarOverlay').classList.remove('open');
+        }
+
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
+            document.getElementById('sidebarOverlay').classList.toggle('open');
         }
 
         function toggleRegTab(tab) {
