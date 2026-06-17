@@ -70,6 +70,7 @@ def startup_event():
                     conn.execute(text(query))
                     conn.commit()
                 except Exception as e:
+                    conn.rollback()
                     logger.info(f"Migration skipped (likely exists): {e}")
         logger.info("Database tables initialized successfully.")
     except Exception as e:
