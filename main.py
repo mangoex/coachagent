@@ -63,7 +63,9 @@ def startup_event():
                 "ALTER TABLE users ADD COLUMN company_id INTEGER REFERENCES companies(id) ON DELETE SET NULL;",
                 "ALTER TABLE users ADD COLUMN sales_goals TEXT;",
                 "ALTER TABLE users ADD COLUMN objectives TEXT;",
-                "ALTER TABLE users ADD COLUMN calendar_id VARCHAR DEFAULT 'primary';"
+                "ALTER TABLE users ADD COLUMN calendar_id VARCHAR DEFAULT 'primary';",
+                "ALTER TABLE companies ADD COLUMN whatsapp_phone_number_id VARCHAR;",
+                "ALTER TABLE companies ADD COLUMN encrypted_whatsapp_token VARCHAR;"
             ]
             for query in migrations:
                 try:
@@ -83,6 +85,10 @@ app.include_router(cron.router)
 # Pydantic schemas
 class CompanyCreate(BaseModel):
     name: str
+
+class CompanyUpdate(BaseModel):
+    whatsapp_phone_number_id: Optional[str] = None
+    whatsapp_token: Optional[str] = None
 
 class SellerPreRegister(BaseModel):
     name: str
@@ -146,6 +152,33 @@ def register_company(payload: CompanyCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(new_company)
     return {"id": new_company.id, "name": new_company.name, "company_code": new_company.company_code}
+
+@app.get("/companies/{company_code}")
+def get_company(company_code: str, db: Session = Depends(get_db)):
+    company = db.query(Company).filter(Company.company_code == company_code).first()
+    if not company:
+        raise HTTPException(status_code=404, detail="Empresa no encontrada")
+    return {
+        "id": company.id, 
+        "name": company.name, 
+        "company_code": company.company_code,
+        "whatsapp_phone_number_id": company.whatsapp_phone_number_id,
+        "has_whatsapp_token": bool(company.encrypted_whatsapp_token)
+    }
+
+@app.put("/companies/{company_code}")
+def update_company(company_code: str, payload: CompanyUpdate, db: Session = Depends(get_db)):
+    company = db.query(Company).filter(Company.company_code == company_code).first()
+    if not company:
+        raise HTTPException(status_code=404, detail="Empresa no encontrada")
+    
+    if payload.whatsapp_phone_number_id is not None:
+        company.whatsapp_phone_number_id = payload.whatsapp_phone_number_id
+    if payload.whatsapp_token is not None:
+        company.set_whatsapp_token(payload.whatsapp_token)
+        
+    db.commit()
+    return {"status": "ok"}
 
 @app.post("/companies/{company_code}/sellers", status_code=201)
 def preregister_seller(company_code: str, payload: SellerPreRegister, db: Session = Depends(get_db)):
@@ -294,7 +327,8 @@ def get_seller_profile(email: str, db: Session = Depends(get_db)):
         "phone_number": user.phone_number,
         "role": user.role,
         "sales_goals": user.sales_goals,
-        "is_google_connected": user.encrypted_refresh_token is not None and user.encrypted_refresh_token != ""
+        "is_google_connected": user.encrypted_refresh_token is not None and user.encrypted_refresh_token != "",
+        "company_code": user.company.company_code if user.company else None
     }
 
 @app.put("/seller/{email}")

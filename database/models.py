@@ -10,9 +10,22 @@ class Company(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
     company_code = Column(String, unique=True, index=True, nullable=False)
+    whatsapp_phone_number_id = Column(String, nullable=True)
+    encrypted_whatsapp_token = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     users = relationship("User", back_populates="company")
+
+    def set_whatsapp_token(self, token: str):
+        if token:
+            self.encrypted_whatsapp_token = encrypt_token(token)
+        else:
+            self.encrypted_whatsapp_token = None
+
+    def get_whatsapp_token(self) -> str | None:
+        if self.encrypted_whatsapp_token:
+            return decrypt_token(self.encrypted_whatsapp_token)
+        return None
 
 class User(Base):
     """

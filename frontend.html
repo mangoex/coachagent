@@ -473,6 +473,9 @@
                 <a class="nav-item" onclick="showAppView('settings')" id="nav-settings">
                     <i class="ph ph-gear"></i> Configuración
                 </a>
+                <a class="nav-item" onclick="showAppView('company')" id="nav-company" style="display:none;">
+                    <i class="ph ph-buildings"></i> Empresa
+                </a>
             </nav>
             <div class="sidebar-footer">
                 <div class="user-profile">
@@ -638,6 +641,41 @@
                 </div>
             </div>
 
+            <!-- VIEW: COMPANY -->
+            <div id="view-company" class="view-panel">
+                <div class="page-header">
+                    <div>
+                        <h2>Configuración de Empresa</h2>
+                        <p>Administración del Tech Provider y credenciales de WhatsApp</p>
+                    </div>
+                </div>
+
+                <div class="card glass" style="max-width: 600px;">
+                    <div class="card-header">
+                        <div class="card-title"><i class="ph ph-buildings"></i> Datos de la Empresa</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Código de Empresa</label>
+                        <input type="text" id="comp_code" placeholder="Cargando..." readonly style="opacity:0.7;">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>WhatsApp Phone Number ID</label>
+                        <input type="text" id="comp_wa_id" placeholder="El ID del número destino de la WABA">
+                    </div>
+
+                    <div class="form-group">
+                        <label>WhatsApp Token (Temporal o Permanente)</label>
+                        <input type="password" id="comp_wa_token" placeholder="Dejar en blanco si no se desea modificar">
+                        <p style="font-size:11px; color:var(--text-muted); margin-top:4px;" id="comp_token_status">Estado: Desconocido</p>
+                    </div>
+                    
+                    <button class="btn" style="margin-top: 10px;" onclick="saveCompanySettings()"><i class="ph ph-floppy-disk"></i> Guardar Empresa</button>
+                    <div id="companyAlert" class="alert" style="margin-top: 15px;"></div>
+                </div>
+            </div>
+
         </main>
         </div>
     </div>
@@ -733,6 +771,14 @@
                         descEl.textContent = 'El agente no podrá crear eventos ni documentos.';
                         btnEl.innerHTML = 'Conectar Ahora';
                         btnEl.className = 'btn';
+                    }
+
+                    // Check Company Tab visibility
+                    if (data.role === 'vendedor_empresa' || data.role === 'admin' || data.company_code) {
+                        document.getElementById('nav-company').style.display = 'flex';
+                        if (data.company_code) {
+                            loadCompanyData(data.company_code);
+                        }
                     }
 
                     // Show Main App
@@ -954,6 +1000,68 @@
                 console.error("Error loading calendars", e);
             }
             if(btn) btn.innerHTML = '<i class="ph ph-arrows-clockwise"></i>';
+        }
+
+        async function loadCompanyData(companyCode) {
+            try {
+                const res = await fetch(`/companies/${companyCode}`);
+                if(res.ok) {
+                    const data = await res.json();
+                    document.getElementById('comp_code').value = data.company_code || '';
+                    document.getElementById('comp_wa_id').value = data.whatsapp_phone_number_id || '';
+                    
+                    const statusEl = document.getElementById('comp_token_status');
+                    if (data.has_whatsapp_token) {
+                        statusEl.textContent = 'Estado: Token configurado (oculto por seguridad)';
+                        statusEl.style.color = 'var(--success)';
+                    } else {
+                        statusEl.textContent = 'Estado: Sin Token configurado';
+                        statusEl.style.color = 'var(--danger)';
+                    }
+                }
+            } catch(e) {
+                console.error("Error loading company data", e);
+            }
+        }
+
+        async function saveCompanySettings() {
+            const companyCode = document.getElementById('comp_code').value;
+            if(!companyCode) return;
+            
+            const btn = document.querySelector('#view-company .btn');
+            btn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Guardando...';
+            btn.disabled = true;
+
+            const payload = {
+                whatsapp_phone_number_id: document.getElementById('comp_wa_id').value
+            };
+            
+            const tokenVal = document.getElementById('comp_wa_token').value;
+            if(tokenVal && tokenVal.trim() !== '') {
+                payload.whatsapp_token = tokenVal;
+            }
+
+            try {
+                const res = await fetch(`/companies/${companyCode}`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                
+                if(res.ok) {
+                    showAlert('companyAlert', '¡Empresa actualizada exitosamente!', true);
+                    document.getElementById('comp_wa_token').value = '';
+                    loadCompanyData(companyCode);
+                } else {
+                    showAlert('companyAlert', 'Error al guardar los cambios de la empresa.', false);
+                }
+            } catch(e) {
+                showAlert('companyAlert', 'Error de conexión', false);
+            }
+            
+            btn.innerHTML = '<i class="ph ph-floppy-disk"></i> Guardar Empresa';
+            btn.disabled = false;
+            setTimeout(() => { document.getElementById('companyAlert').style.display='none'; }, 3000);
         }
 
     </script>

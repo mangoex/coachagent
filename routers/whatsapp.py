@@ -5,7 +5,7 @@ import json
 
 from config.settings import settings
 from database.connection import get_db
-from database.models import User, ConversationLog
+from database.models import User, ConversationLog, Company
 from services.whatsapp_service import WhatsAppService
 from services.calendar_service import GoogleCalendarService
 from agent.redis_memory import redis_memory
@@ -64,6 +64,17 @@ async def receive_message(request: Request, db: Session = Depends(get_db)):
     msg_data = messages[0]
     from_phone = msg_data.get("from")  # Sender's WhatsApp number
     msg_id = msg_data.get("id")
+    
+    # Extract destination phone number ID from Meta payload
+    metadata = value.get("metadata", {})
+    dest_phone_id = metadata.get("phone_number_id")
+    
+    # Resolve company credentials if any
+    company_token = None
+    if dest_phone_id and dest_phone_id != settings.WHATSAPP_PHONE_NUMBER_ID:
+        company = db.query(Company).filter(Company.whatsapp_phone_number_id == dest_phone_id).first()
+        if company:
+            company_token = company.get_whatsapp_token()
 
     # Find the salesperson/tenant associated with this phone number
     user = db.query(User).filter(User.phone_number == from_phone).first()
@@ -72,7 +83,9 @@ async def receive_message(request: Request, db: Session = Depends(get_db)):
         # Optionally send a default warning message
         WhatsAppService.send_text_message(
             to_phone=from_phone,
-            text="Hola. Tu número de teléfono no está registrado en el sistema de Google AI Sales Coach Agent."
+            text="Hola. Tu número de teléfono no está registrado en el sistema de Google AI Sales Coach Agent.",
+            token=company_token,
+            phone_id=dest_phone_id
         )
         return {"status": "ok"}
 
@@ -83,7 +96,9 @@ async def receive_message(request: Request, db: Session = Depends(get_db)):
         logger.error(f"Failed to decrypt refresh token for user {user.email}: {str(e)}")
         WhatsAppService.send_text_message(
             to_phone=from_phone,
-            text="Error de autenticación. Por favor, re-conecta tus credenciales de Google Workspace."
+            text="Error de autenticación. Por favor, re-conecta tus credenciales de Google Workspace.",
+            token=company_token,
+            phone_id=dest_phone_id
         )
         return {"status": "ok"}
 
@@ -123,7 +138,7 @@ async def receive_message(request: Request, db: Session = Depends(get_db)):
                 "¿Necesitas generar una cotización para este cliente? Si es así, dime el nombre del cliente, "
                 "producto, cantidad y precio base. ¡Yo me encargo del resto!"
             )
-            WhatsAppService.send_text_message(from_phone, reply_text)
+            WhatsAppService.send_text_message(from_phone, reply_text, token=company_token, phone_id=dest_phone_id)
             
             # Log reply to DB
             db_log_out = ConversationLog(phone_number=from_phone, sender="agent", message=reply_text)
@@ -143,7 +158,7 @@ async def receive_message(request: Request, db: Session = Depends(get_db)):
                 "- 03:00 PM - 04:00 PM\n\n"
                 "Dime cuál prefieres para agendarlo de inmediato."
             )
-            WhatsAppService.send_text_message(from_phone, reply_text)
+            WhatsAppService.send_text_message(from_phone, reply_text, token=company_token, phone_id=dest_phone_id)
             
             # Log reply to DB
             db_log_out = ConversationLog(phone_number=from_phone, sender="agent", message=reply_text)
@@ -171,7 +186,7 @@ async def receive_message(request: Request, db: Session = Depends(get_db)):
     redis_memory.add_message(from_phone, "agent", agent_reply)
 
     # Send message to WhatsApp
-    WhatsAppService.send_text_message(from_phone, agent_reply)
+    WhatsAppService.send_text_message(from_phone, agent_reply, token=company_token, phone_id=dest_phone_id)
 
     # Log agent response to DB
     db_log_out = ConversationLog(phone_number=from_phone, sender="agent", message=agent_reply)
