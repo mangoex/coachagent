@@ -234,8 +234,13 @@
         function showTab(tab) {
             document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            document.getElementById(`panel-${tab}`).classList.add('active');
-            event.target.classList.add('active');
+            
+            const panel = document.getElementById(`panel-${tab}`);
+            if (panel) panel.classList.add('active');
+            
+            // Find the button that corresponds to this tab and make it active
+            const btn = document.querySelector(`.tab-btn[onclick*="showTab('${tab}')"]`);
+            if (btn) btn.classList.add('active');
         }
 
         function toggleSellerFields() {
