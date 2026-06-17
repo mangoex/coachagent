@@ -260,9 +260,20 @@ class GeminiAgent:
             # Map contents back to basic history format
             updated_history = []
             for item in contents:
-                if len(item.parts) > 0 and item.parts[0].text:
+                if not item.parts:
+                    continue
+                # Safely extract text, ignoring parts that are function calls/responses
+                texts = []
+                for part in item.parts:
+                    try:
+                        if part.text:
+                            texts.append(part.text)
+                    except ValueError:
+                        pass
+                
+                if texts:
                     role = "user" if item.role == "user" else "agent"
-                    updated_history.append({"role": role, "content": item.parts[0].text})
+                    updated_history.append({"role": role, "content": "\n".join(texts)})
             
             updated_history.append({"role": "agent", "content": final_reply})
             return final_reply, updated_history
