@@ -92,6 +92,7 @@ class GeminiAgent:
                 events = GoogleCalendarService.list_events(self.refresh_token, date_str)
                 return json.dumps(events, ensure_ascii=False)
             except Exception as e:
+                logger.error(f"Failed to list events: {str(e)}")
                 return f"Error listing events: {str(e)}"
 
         def create_calendar_event(

@@ -23,8 +23,8 @@ class GoogleCalendarService:
             target_date = datetime.utcnow().date()
 
         # Define bounds of the day in RFC3339 format
-        time_min = datetime.combine(target_date, time.min).isoformat() + "Z"
-        time_max = datetime.combine(target_date, time.max).isoformat() + "Z"
+        time_min = f"{target_date.isoformat()}T00:00:00Z"
+        time_max = f"{target_date.isoformat()}T23:59:59Z"
 
         events_result = service.events().list(
             calendarId="primary",
