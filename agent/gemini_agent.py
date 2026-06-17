@@ -66,12 +66,12 @@ class GeminiAgent:
         """
         Defines the local python functions as Vertex AI tools.
         """
-        def list_calendar_events(date_str: Optional[str] = None) -> str:
+        def list_calendar_events(date_str: str = "") -> str:
             """
             List calendar events for a specific day.
             
             Args:
-                date_str: Optional date in 'YYYY-MM-DD' format. If not provided, defaults to today.
+                date_str: Date in 'YYYY-MM-DD' format. If empty, defaults to today.
             """
             try:
                 events = GoogleCalendarService.list_events(self.refresh_token, date_str)
@@ -83,8 +83,8 @@ class GeminiAgent:
             summary: str, 
             start_time_iso: str, 
             end_time_iso: str, 
-            attendees: Optional[List[str]] = None, 
-            description: Optional[str] = None
+            attendees_csv: str = "", 
+            description: str = ""
         ) -> str:
             """
             Create a new event in Google Calendar.
@@ -93,12 +93,13 @@ class GeminiAgent:
                 summary: Title of the meeting.
                 start_time_iso: Start date-time in ISO 8601 format (e.g. '2026-06-16T10:00:00Z').
                 end_time_iso: End date-time in ISO 8601 format (e.g. '2026-06-16T11:00:00Z').
-                attendees: Optional list of email addresses of attendees.
-                description: Optional description of the meeting.
+                attendees_csv: Comma-separated email addresses of attendees.
+                description: Description of the meeting.
             """
             try:
+                attendees_list = [a.strip() for a in attendees_csv.split(",")] if attendees_csv else None
                 event = GoogleCalendarService.create_event(
-                    self.refresh_token, summary, start_time_iso, end_time_iso, attendees, description
+                    self.refresh_token, summary, start_time_iso, end_time_iso, attendees_list, description
                 )
                 return json.dumps(event, ensure_ascii=False)
             except Exception as e:
@@ -106,26 +107,27 @@ class GeminiAgent:
 
         def update_calendar_event(
             event_id: str, 
-            summary: Optional[str] = None, 
-            start_time_iso: Optional[str] = None, 
-            end_time_iso: Optional[str] = None, 
-            attendees: Optional[List[str]] = None, 
-            description: Optional[str] = None
+            summary: str = "", 
+            start_time_iso: str = "", 
+            end_time_iso: str = "", 
+            attendees_csv: str = "", 
+            description: str = ""
         ) -> str:
             """
             Update an existing calendar event.
             
             Args:
                 event_id: The ID of the event to update.
-                summary: Optional new title of the meeting.
-                start_time_iso: Optional new start date-time in ISO 8601 format.
-                end_time_iso: Optional new end date-time in ISO 8601 format.
-                attendees: Optional list of attendee emails.
-                description: Optional new description.
+                summary: New title of the meeting.
+                start_time_iso: New start date-time in ISO 8601 format.
+                end_time_iso: New end date-time in ISO 8601 format.
+                attendees_csv: Comma-separated list of attendee emails.
+                description: New description.
             """
             try:
+                attendees_list = [a.strip() for a in attendees_csv.split(",")] if attendees_csv else None
                 event = GoogleCalendarService.update_event(
-                    self.refresh_token, event_id, summary, start_time_iso, end_time_iso, attendees, description
+                    self.refresh_token, event_id, summary or None, start_time_iso or None, end_time_iso or None, attendees_list, description or None
                 )
                 return json.dumps(event, ensure_ascii=False)
             except Exception as e:
