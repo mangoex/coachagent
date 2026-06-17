@@ -176,9 +176,21 @@ def claim_account(payload: SellerClaim, db: Session = Depends(get_db)):
 
 @app.post("/auth/seller/independent")
 def register_independent(payload: SellerIndependent, db: Session = Depends(get_db)):
-    existing_user = db.query(User).filter((User.email == payload.email) | (User.phone_number == payload.phone_number)).first()
-    if existing_user:
-         raise HTTPException(status_code=400, detail="Ya existe un vendedor con este correo o teléfono.")
+    existing_user_by_phone = db.query(User).filter(User.phone_number == payload.phone_number).first()
+    existing_user_by_email = db.query(User).filter(User.email == payload.email).first()
+
+    # Si el usuario ya existe por teléfono, actualizamos su correo y UID (para que pueda entrar con su cuenta de Google)
+    if existing_user_by_phone:
+        existing_user_by_phone.email = payload.email
+        existing_user_by_phone.name = payload.name
+        existing_user_by_phone.firebase_uid = payload.firebase_uid
+        if payload.google_refresh_token:
+            existing_user_by_phone.set_refresh_token(payload.google_refresh_token)
+        db.commit()
+        return {"detail": "Cuenta vinculada exitosamente al nuevo correo", "phone_number": existing_user_by_phone.phone_number}
+
+    if existing_user_by_email:
+         raise HTTPException(status_code=400, detail="Ya existe un vendedor con este correo pero diferente teléfono.")
          
     new_user = User(
         name=payload.name,
