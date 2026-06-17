@@ -2,6 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from pydantic import BaseModel, EmailStr
 from typing import Optional
 import uuid
@@ -53,6 +54,21 @@ def startup_event():
     logger.info("Initializing database tables...")
     try:
         Base.metadata.create_all(bind=engine)
+        # Hotfix: add new columns to existing users table
+        with engine.connect() as conn:
+            migrations = [
+                "ALTER TABLE users ADD COLUMN firebase_uid VARCHAR;",
+                "ALTER TABLE users ADD COLUMN role VARCHAR DEFAULT 'vendedor_independiente';",
+                "ALTER TABLE users ADD COLUMN company_id INTEGER REFERENCES companies(id) ON DELETE SET NULL;",
+                "ALTER TABLE users ADD COLUMN sales_goals TEXT;",
+                "ALTER TABLE users ADD COLUMN objectives TEXT;"
+            ]
+            for query in migrations:
+                try:
+                    conn.execute(text(query))
+                    conn.commit()
+                except Exception as e:
+                    logger.info(f"Migration skipped (likely exists): {e}")
         logger.info("Database tables initialized successfully.")
     except Exception as e:
         logger.critical(f"Failed to initialize database tables: {str(e)}")
