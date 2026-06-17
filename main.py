@@ -277,6 +277,12 @@ def get_google_auth_url(email: str, request: Request):
         prompt='consent',
         state=email
     )
+    
+    # Almacenar el code_verifier si PKCE está habilitado en la librería
+    cv = getattr(flow, "code_verifier", None)
+    if cv:
+        redis_memory.set_state(f"oauth_{email}", "verifying", metadata={"code_verifier": cv}, ttl=600)
+        
     return {"url": authorization_url}
 
 @app.get("/auth/google/callback")
@@ -295,6 +301,12 @@ def google_auth_callback(state: str, code: str, request: Request, db: Session = 
         scopes=SCOPES,
         redirect_uri=redirect_uri
     )
+    
+    # Recuperar el code_verifier de Redis
+    _, meta = redis_memory.get_state(f"oauth_{state}")
+    code_verifier = meta.get("code_verifier")
+    if code_verifier:
+        flow.code_verifier = code_verifier
     
     try:
         flow.fetch_token(code=code)
