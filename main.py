@@ -17,6 +17,7 @@ from agent.redis_memory import redis_memory
 from agent.gemini_agent import GeminiAgent
 from routers import whatsapp, cron
 from config.settings import settings
+from services.calendar_service import GoogleCalendarService
 
 # Set up logging configuration
 logging.basicConfig(

@@ -30,6 +30,7 @@
             app = initializeApp(firebaseConfig);
             auth = getAuth(app);
             provider = new GoogleAuthProvider();
+            provider.setCustomParameters({ prompt: 'select_account' });
             // Request scopes for Google Drive/Docs/Sheets/Calendar
             provider.addScope('https://www.googleapis.com/auth/calendar');
             provider.addScope('https://www.googleapis.com/auth/spreadsheets');

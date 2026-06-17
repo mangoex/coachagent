@@ -12,6 +12,9 @@ def get_user_credentials(refresh_token: str) -> Credentials:
     client_id = settings.GOOGLE_CLIENT_ID or os.getenv("GOOGLE_CLIENT_ID")
     client_secret = settings.GOOGLE_CLIENT_SECRET or os.getenv("GOOGLE_CLIENT_SECRET")
     
+    if client_id: client_id = client_id.strip()
+    if client_secret: client_secret = client_secret.strip()
+    
     creds = Credentials(
         token=None,
         refresh_token=refresh_token,
