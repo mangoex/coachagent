@@ -22,10 +22,12 @@ class GeminiAgent:
     Orchestrates Gemini tool calling and reasoning with Vertex AI.
     If Vertex AI is not initialized or fails, falls back to a simulated mock agent.
     """
-    def __init__(self, user_refresh_token: str, spreadsheet_id: Optional[str] = None, template_doc_id: Optional[str] = None):
+    def __init__(self, user_refresh_token: str, spreadsheet_id: Optional[str] = None, template_doc_id: Optional[str] = None, sales_goals: Optional[str] = None, objectives: Optional[str] = None):
         self.refresh_token = user_refresh_token
         self.spreadsheet_id = spreadsheet_id
         self.template_doc_id = template_doc_id
+        self.sales_goals = sales_goals
+        self.objectives = objectives
         self.vertex_initialized = False
 
         if VERTEX_AVAILABLE:
@@ -42,6 +44,11 @@ class GeminiAgent:
                     "Cuando se apruebe una cotización, usa la herramienta generate_quotation para generar la propuesta y devuélvele al vendedor el enlace firmado del PDF resultante.\n"
                     "Mantén un tono profesional, motivador, conciso y enfocado a objetivos comerciales. Responde en español."
                 )
+                
+                if self.sales_goals:
+                    self.system_instruction += f"\nMeta de Ventas del vendedor: {self.sales_goals}"
+                if self.objectives:
+                    self.system_instruction += f"\nObjetivos específicos: {self.objectives}"
                 
                 self.model = GenerativeModel(
                     model_name="gemini-2.5-pro",

@@ -4,6 +4,16 @@ from sqlalchemy.sql import func
 from database.connection import Base
 from config.security import encrypt_token, decrypt_token
 
+class Company(Base):
+    __tablename__ = "companies"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    company_code = Column(String, unique=True, index=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    users = relationship("User", back_populates="company")
+
 class User(Base):
     """
     Salesperson or Tenant representation.
@@ -15,6 +25,14 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     name = Column(String, nullable=False)
     phone_number = Column(String, unique=True, index=True, nullable=False)  # Format: "52155..." or "+1..."
+    
+    # Firebase and Role modifications
+    firebase_uid = Column(String, unique=True, index=True, nullable=True)
+    role = Column(String, default="vendedor_independiente") # 'admin_empresa', 'vendedor_empresa', 'vendedor_independiente'
+    company_id = Column(Integer, ForeignKey("companies.id", ondelete="SET NULL"), nullable=True)
+    sales_goals = Column(Text, nullable=True)
+    objectives = Column(Text, nullable=True)
+    
     encrypted_refresh_token = Column(Text, nullable=True)
     
     # Associated Workspace resources
@@ -26,14 +44,16 @@ class User(Base):
 
     # Relationships
     clients = relationship("Client", back_populates="user", cascade="all, delete-orphan")
+    company = relationship("Company", back_populates="users")
 
     def set_refresh_token(self, raw_token: str):
         """Encrypts and stores the Google OAuth 2.0 refresh token."""
-        self.encrypted_refresh_token = encrypt_token(raw_token)
+        if raw_token:
+            self.encrypted_refresh_token = encrypt_token(raw_token)
 
     def get_refresh_token(self) -> str:
         """Decrypts and returns the Google OAuth 2.0 refresh token."""
-        return decrypt_token(self.encrypted_refresh_token)
+        return decrypt_token(self.encrypted_refresh_token) if self.encrypted_refresh_token else None
 
 
 class Client(Base):

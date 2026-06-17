@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google AI Sales Coach Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Space+Grotesk:wght@400;600&display=swap" rel="stylesheet">
+    <!-- Firebase SDK (Modular) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
+        import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js";
+
+        // TODO: REEMPLAZAR CON TU CONFIGURACIÓN DE FIREBASE
+        const firebaseConfig = {
+            apiKey: "TU_API_KEY",
+            authDomain: "TU_PROYECTO.firebaseapp.com",
+            projectId: "TU_PROYECTO",
+            storageBucket: "TU_PROYECTO.appspot.com",
+            messagingSenderId: "SENDER_ID",
+            appId: "APP_ID"
+        };
+
+        let app, auth, provider;
+        try {
+            app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            provider = new GoogleAuthProvider();
+            // Request scopes for Google Drive/Docs/Sheets/Calendar
+            provider.addScope('https://www.googleapis.com/auth/calendar');
+            provider.addScope('https://www.googleapis.com/auth/spreadsheets');
+            provider.addScope('https://www.googleapis.com/auth/drive');
+        } catch(e) {
+            console.warn("Firebase no está configurado aún. Operando en modo desarrollo/mock.");
+        }
+
+        window.firebaseLogin = async function() {
+            if(!auth) {
+                // Mock login if Firebase is not configured
+                const mockEmail = prompt("Firebase no configurado. Ingresa un email falso para simular:");
+                if(mockEmail) {
+                    window.currentUser = { email: mockEmail, uid: "mock_uid_" + Date.now(), refreshToken: "mock_token" };
+                    document.getElementById("user-status").textContent = `Autenticado: ${mockEmail}`;
+                    return window.currentUser;
+                }
+                return null;
+            }
+            try {
+                const result = await signInWithPopup(auth, provider);
+                const credential = GoogleAuthProvider.credentialFromResult(result);
+                // IMPORTANT: In a real app, getting the long-lived refresh token requires a server-side OAuth flow (offline access).
+                // Firebase web SDK only returns an idToken and short-lived accessToken.
+                // We mock the refresh token here for the UI flow, but normally it's generated via OAuth Playground or server flow.
+                const token = credential.accessToken; 
+                window.currentUser = { 
+                    email: result.user.email, 
+                    uid: result.user.uid,
+                    refreshToken: prompt("Firebase no devuelve Refresh Token directamente. Pega tu Refresh Token generado en OAuth Playground:") || "mock_token"
+                };
+                document.getElementById("user-status").textContent = `Autenticado: ${result.user.email}`;
+                return window.currentUser;
+            } catch (error) {
+                console.error("Error en Firebase Login:", error);
+                alert("Error al iniciar sesión: " + error.message);
+                return null;
+            }
+        };
+    </script>
+    <style>
+        :root {
+            --bg-gradient: linear-gradient(135deg, #0f0c20 0%, #15102a 50%, #060214 100%);
+            --card-bg: rgba(25, 20, 50, 0.45);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --glow-color: rgba(124, 77, 255, 0.3);
+            --primary: #7c4dff;
+            --accent: #00e5ff;
+            --text-main: #f5f5fa;
+            --text-muted: #9a90bd;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-gradient);
+            color: var(--text-main);
+            min-height: 100vh;
+        }
+        header {
+            padding: 24px 5%;
+            display: flex; justify-content: space-between; align-items: center;
+            border-bottom: 1px solid var(--card-border);
+            backdrop-filter: blur(12px);
+        }
+        .logo-text { font-family: 'Space Grotesk', sans-serif; font-size: 22px; font-weight: 600; color:#fff;}
+        main { max-width: 1200px; margin: 40px auto; padding: 0 20px;}
+        .tabs { display: flex; gap: 20px; margin-bottom: 30px; }
+        .tab-btn {
+            background: var(--card-bg); border: 1px solid var(--card-border);
+            padding: 12px 24px; border-radius: 12px; color: #fff; cursor: pointer;
+            font-size: 16px; transition: 0.3s;
+        }
+        .tab-btn.active { background: var(--primary); border-color: var(--primary); }
+        .panel { display: none; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 24px; padding: 30px; }
+        .panel.active { display: block; }
+        h2 { font-family: 'Space Grotesk', sans-serif; margin-bottom: 24px; color: #fff; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; font-size: 14px; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; }
+        input, select { width: 100%; background: rgba(10, 5, 25, 0.5); border: 1px solid var(--card-border); border-radius: 12px; padding: 14px 16px; color: var(--text-main); outline: none; }
+        .btn { background: var(--primary); border: none; border-radius: 12px; padding: 14px; color: #fff; font-weight: bold; cursor: pointer; width: 100%; margin-top: 10px; }
+        .btn:hover { filter: brightness(1.1); }
+        .alert { padding: 12px; border-radius: 10px; margin-top: 15px; display: none; }
+        .alert.success { background: rgba(76, 175, 80, 0.15); color: #81c784; border: 1px solid #4caf50; }
+        .alert.error { background: rgba(244, 67, 54, 0.15); color: #e57373; border: 1px solid #f44336; }
+        .auth-bar { background: rgba(255,255,255,0.05); padding: 15px; border-radius: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+        .chat-container { height: 500px; background: rgba(10, 5, 25, 0.35); border-radius: 20px; display: flex; flex-direction: column; overflow: hidden; margin-top: 30px;}
+        .chat-messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+        .message { max-width: 80%; padding: 14px 18px; border-radius: 18px; font-size: 14.5px; }
+        .message.user { align-self: flex-end; background: var(--primary); }
+        .message.agent { align-self: flex-start; background: rgba(255, 255, 255, 0.08); }
+        .chat-input { padding: 16px; display: flex; gap: 10px; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo-text">Google AI Sales Coach</div>
+        <div id="user-status" style="color:var(--accent); font-weight: bold;">No Autenticado</div>
+    </header>
+
+    <main>
+        <div class="tabs">
+            <button class="tab-btn active" onclick="showTab('empresa')">Soy Empresa</button>
+            <button class="tab-btn" onclick="showTab('vendedor')">Soy Vendedor</button>
+            <button class="tab-btn" onclick="showTab('chat')">Playground</button>
+        </div>
+
+        <!-- PANEL EMPRESA -->
+        <div id="panel-empresa" class="panel active">
+            <h2>Registrar Empresa</h2>
+            <div class="form-group">
+                <input type="text" id="comp_name" placeholder="Nombre de la Empresa">
+                <button class="btn" onclick="createCompany()">Crear Empresa</button>
+            </div>
+            <div id="companyCodeDisplay" class="alert success"></div>
+
+            <h2 style="margin-top:40px;">Pre-registrar Vendedor</h2>
+            <div class="form-group"><input type="text" id="pre_code" placeholder="Código de la Empresa"></div>
+            <div class="form-group"><input type="text" id="pre_name" placeholder="Nombre del Vendedor"></div>
+            <div class="form-group"><input type="email" id="pre_email" placeholder="Correo del Vendedor"></div>
+            <div class="form-group"><input type="text" id="pre_phone" placeholder="Teléfono / WhatsApp"></div>
+            <div class="form-group"><input type="text" id="pre_goals" placeholder="Meta de Ventas (Ej. 10 cierres al mes)"></div>
+            <button class="btn" onclick="preRegister()">Registrar Vendedor</button>
+            <div id="preAlert" class="alert"></div>
+        </div>
+
+        <!-- PANEL VENDEDOR -->
+        <div id="panel-vendedor" class="panel">
+            <h2>Acceso Vendedor</h2>
+            <div class="auth-bar">
+                <span>Inicia sesión primero para obtener tu UID y Token:</span>
+                <button class="btn" style="width:auto; margin:0;" onclick="window.firebaseLogin()">Autenticarse con Google</button>
+            </div>
+
+            <div class="form-group">
+                <label>Tipo de Vendedor</label>
+                <select id="seller_type" onchange="toggleSellerFields()">
+                    <option value="code">Tengo Código de Empresa</option>
+                    <option value="indep">Soy Independiente</option>
+                </select>
+            </div>
+
+            <!-- Claim Account -->
+            <div id="fields_code">
+                <div class="form-group"><input type="text" id="claim_code" placeholder="Código de la Empresa"></div>
+                <button class="btn" onclick="claimAccount()">Vincular y Activar Cuenta</button>
+            </div>
+
+            <!-- Independent -->
+            <div id="fields_indep" style="display:none;">
+                <div class="form-group"><input type="text" id="ind_name" placeholder="Nombre Completo"></div>
+                <div class="form-group"><input type="text" id="ind_phone" placeholder="WhatsApp"></div>
+                <div class="form-group"><input type="text" id="ind_goals" placeholder="Tus Metas de Venta"></div>
+                <button class="btn" onclick="registerIndependent()">Registrarme como Independiente</button>
+            </div>
+            <div id="sellerAlert" class="alert"></div>
+        </div>
+
+        <!-- PANEL CHAT -->
+        <div id="panel-chat" class="panel">
+            <h2>Playground</h2>
+            <div class="form-group">
+                <input type="text" id="chatPhone" placeholder="Tu número de teléfono registrado">
+            </div>
+            <div class="chat-container">
+                <div class="chat-messages" id="chatMsgs"></div>
+                <div class="chat-input">
+                    <input type="text" id="chatText" style="flex:1;" placeholder="Mensaje..." onkeypress="if(event.key==='Enter') sendChat()">
+                    <button class="btn" style="width:80px; margin:0;" onclick="sendChat()">Enviar</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        function showTab(tab) {
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(`panel-${tab}`).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        function toggleSellerFields() {
+            const val = document.getElementById('seller_type').value;
+            document.getElementById('fields_code').style.display = val === 'code' ? 'block' : 'none';
+            document.getElementById('fields_indep').style.display = val === 'indep' ? 'block' : 'none';
+        }
+
+        async function createCompany() {
+            const name = document.getElementById('comp_name').value;
+            const res = await fetch('/companies', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ name })
+            });
+            const data = await res.json();
+            const div = document.getElementById('companyCodeDisplay');
+            div.style.display = 'block';
+            div.innerHTML = `Empresa creada. Tu código único es: <strong>${data.company_code}</strong>`;
+            document.getElementById('pre_code').value = data.company_code;
+        }
+
+        async function preRegister() {
+            const code = document.getElementById('pre_code').value;
+            const payload = {
+                name: document.getElementById('pre_name').value,
+                email: document.getElementById('pre_email').value,
+                phone_number: document.getElementById('pre_phone').value,
+                sales_goals: document.getElementById('pre_goals').value
+            };
+            const res = await fetch(`/companies/${code}/sellers`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
+            });
+            const alert = document.getElementById('preAlert');
+            alert.style.display = 'block';
+            alert.className = res.ok ? 'alert success' : 'alert error';
+            alert.textContent = res.ok ? 'Vendedor pre-registrado. Pásale el código.' : 'Error al registrar.';
+        }
+
+        async function claimAccount() {
+            if(!window.currentUser) return alert("Debes autenticarte con Google primero.");
+            const payload = {
+                company_code: document.getElementById('claim_code').value,
+                email: window.currentUser.email,
+                firebase_uid: window.currentUser.uid,
+                google_refresh_token: window.currentUser.refreshToken
+            };
+            const res = await fetch('/auth/seller/claim', {
+                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
+            });
+            const alertBox = document.getElementById('sellerAlert');
+            alertBox.style.display = 'block';
+            if(res.ok) {
+                const data = await res.json();
+                alertBox.className = 'alert success';
+                alertBox.textContent = 'Cuenta vinculada exitosamente. Tu teléfono es: ' + data.phone_number;
+            } else {
+                alertBox.className = 'alert error';
+                alertBox.textContent = 'Error: No se encontró el pre-registro para tu email o código.';
+            }
+        }
+
+        async function registerIndependent() {
+            if(!window.currentUser) return alert("Debes autenticarte con Google primero.");
+            const payload = {
+                name: document.getElementById('ind_name').value,
+                phone_number: document.getElementById('ind_phone').value,
+                email: window.currentUser.email,
+                firebase_uid: window.currentUser.uid,
+                google_refresh_token: window.currentUser.refreshToken,
+                sales_goals: document.getElementById('ind_goals').value
+            };
+            const res = await fetch('/auth/seller/independent', {
+                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
+            });
+            const alertBox = document.getElementById('sellerAlert');
+            alertBox.style.display = 'block';
+            alertBox.className = res.ok ? 'alert success' : 'alert error';
+            alertBox.textContent = res.ok ? 'Registrado como independiente' : 'Error al registrar';
+        }
+
+        async function sendChat() {
+            const phone = document.getElementById('chatPhone').value;
+            const text = document.getElementById('chatText').value;
+            if(!phone || !text) return;
+
+            const chatMsgs = document.getElementById('chatMsgs');
+            chatMsgs.innerHTML += `<div class="message user">${text}</div>`;
+            document.getElementById('chatText').value = '';
+
+            const res = await fetch('/agent/chat', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ phone_number: phone, message: text })
+            });
+            const data = await res.json();
+            chatMsgs.innerHTML += `<div class="message agent">${data.reply || data.detail}</div>`;
+            chatMsgs.scrollTop = chatMsgs.scrollHeight;
+        }
+    </script>
+</body>
+</html>
