@@ -276,10 +276,13 @@ class GeminiAgent:
                 response = self.model.generate_content(contents)
 
             try:
-                final_reply = response.text
-                if not final_reply:
-                    final_reply = "Entendido."
-            except ValueError:
+                if response.candidates and response.candidates[0].function_calls:
+                    final_reply = "¡Listo! He procesado tu solicitud."
+                else:
+                    final_reply = response.text
+                    if not final_reply:
+                        final_reply = "Entendido."
+            except Exception:
                 final_reply = "¡Listo! He procesado tu solicitud."
             
             # Map contents back to basic history format
@@ -291,9 +294,12 @@ class GeminiAgent:
                 texts = []
                 for part in item.parts:
                     try:
-                        if part.text:
-                            texts.append(part.text)
-                    except ValueError:
+                        if getattr(part, 'function_call', None) or getattr(part, 'function_response', None):
+                            continue
+                        text_val = getattr(part, 'text', None)
+                        if text_val:
+                            texts.append(text_val)
+                    except Exception:
                         pass
                 
                 if texts:
@@ -304,7 +310,7 @@ class GeminiAgent:
             return final_reply, updated_history
 
         except Exception as e:
-            logger.error(f"Error in GeminiAgent execution: {str(e)}")
+            logger.exception("Error in GeminiAgent execution")
             # Fallback to mock logic if live Vertex call fails
             return self._run_mock(history, user_message)
 
