@@ -120,12 +120,12 @@ SCOPES = [
 def get_client_secrets():
     return {
         "web": {
-            "client_id": settings.GOOGLE_CLIENT_ID,
+            "client_id": settings.GOOGLE_CLIENT_ID.strip() if settings.GOOGLE_CLIENT_ID else None,
             "project_id": settings.GCP_PROJECT_ID,
             "auth_uri": "https://accounts.google.com/o/oauth2/auth",
             "token_uri": "https://oauth2.googleapis.com/token",
             "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-            "client_secret": settings.GOOGLE_CLIENT_SECRET,
+            "client_secret": settings.GOOGLE_CLIENT_SECRET.strip() if settings.GOOGLE_CLIENT_SECRET else None,
             "redirect_uris": []
         }
     }
