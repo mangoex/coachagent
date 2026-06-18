@@ -182,6 +182,37 @@ def update_company(company_code: str, payload: CompanyUpdate, db: Session = Depe
     db.commit()
     return {"status": "ok"}
 
+@app.get("/companies/{company_code}/sellers")
+def list_company_sellers(company_code: str, db: Session = Depends(get_db)):
+    company = db.query(Company).filter(Company.company_code == company_code).first()
+    if not company:
+        raise HTTPException(status_code=404, detail="Empresa no encontrada")
+    
+    sellers = db.query(User).filter(User.company_id == company.id).all()
+    return [
+        {
+            "id": s.id,
+            "name": s.name,
+            "email": s.email,
+            "phone_number": s.phone_number,
+            "role": s.role,
+            "sales_goals": s.sales_goals,
+            "objectives": s.objectives
+        } for s in sellers
+    ]
+
+@app.put("/seller/{user_id}/goals")
+def update_seller_goals(user_id: int, payload: SellerUpdate, db: Session = Depends(get_db)):
+    seller = db.query(User).filter(User.id == user_id).first()
+    if not seller:
+        raise HTTPException(status_code=404, detail="Vendedor no encontrado")
+    
+    if payload.sales_goals is not None:
+        seller.sales_goals = payload.sales_goals
+    
+    db.commit()
+    return {"status": "ok", "sales_goals": seller.sales_goals}
+
 @app.post("/companies/{company_code}/sellers", status_code=201)
 def preregister_seller(company_code: str, payload: SellerPreRegister, db: Session = Depends(get_db)):
     company = db.query(Company).filter(Company.company_code == company_code).first()

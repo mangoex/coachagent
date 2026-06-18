@@ -477,6 +477,9 @@
                 <a class="nav-item" onclick="showAppView('company')" id="nav-company" style="display:none;">
                     <i class="ph ph-buildings"></i> Empresa
                 </a>
+                <a class="nav-item" onclick="showAppView('team')" id="nav-team" style="display:none;">
+                    <i class="ph ph-users-three"></i> Mi Equipo
+                </a>
             </nav>
             <div class="sidebar-footer">
                 <div class="user-profile">
@@ -677,7 +680,59 @@
                 </div>
             </div>
 
+            <!-- VIEW: TEAM -->
+            <div id="view-team" class="view-panel">
+                <div class="page-header">
+                    <div>
+                        <h2>Mi Equipo</h2>
+                        <p>Administra los vendedores de tu empresa y sus metas</p>
+                    </div>
+                    <button class="btn btn-outline" onclick="loadTeamData()"><i class="ph ph-arrows-clockwise"></i> Refrescar</button>
+                </div>
+
+                <div class="card glass">
+                    <div class="card-header">
+                        <div class="card-title"><i class="ph ph-users"></i> Vendedores</div>
+                    </div>
+                    <div style="overflow-x: auto;">
+                        <table style="width: 100%; text-align: left; border-collapse: collapse;">
+                            <thead>
+                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+                                    <th style="padding: 15px 10px;">Nombre</th>
+                                    <th style="padding: 15px 10px;">Teléfono</th>
+                                    <th style="padding: 15px 10px;">Metas Asignadas</th>
+                                    <th style="padding: 15px 10px;">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="team-table-body">
+                                <tr><td colspan="4" style="padding: 15px 10px; text-align:center;">Cargando equipo...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
         </main>
+        </div>
+    </div>
+
+    <!-- Edit Goals Modal -->
+    <div id="modal-edit-goals" class="hidden" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:9999; display:flex; align-items:center; justify-content:center;">
+        <div class="card glass" style="width:90%; max-width:500px;">
+            <div class="card-header">
+                <div class="card-title">Editar Metas de Venta</div>
+                <button class="btn-outline" style="border:none; color:white;" onclick="document.getElementById('modal-edit-goals').classList.add('hidden')"><i class="ph ph-x"></i></button>
+            </div>
+            <div class="form-group">
+                <label>Vendedor</label>
+                <input type="text" id="edit_goal_seller_name" readonly style="opacity:0.7">
+            </div>
+            <div class="form-group">
+                <label>Nuevas Metas</label>
+                <textarea id="edit_goal_text" rows="4" placeholder="Establece las metas que el sistema usará para crear sus planes semanales..."></textarea>
+            </div>
+            <input type="hidden" id="edit_goal_seller_id">
+            <button class="btn" style="width:100%; margin-top:10px;" onclick="saveSellerGoals()">Guardar Metas</button>
         </div>
     </div>
 
@@ -709,6 +764,8 @@
             
             if (view === 'settings') {
                 loadCalendars();
+            } else if (view === 'team') {
+                loadTeamData();
             }
         }
 
@@ -811,6 +868,10 @@
                     // Check Company Tab visibility
                     if (data.role === 'vendedor_empresa' || data.role === 'admin' || data.company_code) {
                         document.getElementById('nav-company').style.display = 'flex';
+                        // Only show team if admin (or let's say if they have a company code, but ideally just for admins. Let's assume anyone managing the company is admin_empresa)
+                        if (data.role === 'admin' || data.role === 'admin_empresa') {
+                            document.getElementById('nav-team').style.display = 'flex';
+                        }
                         if (data.company_code) {
                             loadCompanyData(data.company_code);
                         }
@@ -1099,6 +1160,84 @@
             setTimeout(() => { document.getElementById('companyAlert').style.display='none'; }, 3000);
         }
 
+
+        async function loadTeamData() {
+            if(!window.sellerData || !window.sellerData.company_code) return;
+            const tbody = document.getElementById('team-table-body');
+            tbody.innerHTML = '<tr><td colspan="4" style="padding: 15px 10px; text-align:center;"><i class="ph ph-spinner ph-spin"></i> Cargando...</td></tr>';
+            
+            try {
+                const res = await fetch(`/companies/${window.sellerData.company_code}/sellers`);
+                if(res.ok) {
+                    const sellers = await res.json();
+                    tbody.innerHTML = '';
+                    if(sellers.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="4" style="padding: 15px 10px; text-align:center;">No hay vendedores registrados en esta empresa.</td></tr>';
+                        return;
+                    }
+                    sellers.forEach(s => {
+                        const tr = document.createElement('tr');
+                        tr.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
+                        const roleBadge = s.role === 'admin' || s.role === 'admin_empresa' ? '<span style="font-size:10px; background:var(--primary); padding:2px 6px; border-radius:4px; margin-left:8px;">Admin</span>' : '';
+                        tr.innerHTML = `
+                            <td style="padding: 15px 10px;">
+                                <div style="font-weight:600;">${s.name}</div>
+                                <div style="font-size:12px; color:var(--text-muted);">${s.email}</div>
+                            </td>
+                            <td style="padding: 15px 10px; color:var(--accent); font-family:monospace;">${s.phone_number}</td>
+                            <td style="padding: 15px 10px; font-size:13px; max-width:250px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${s.sales_goals || ''}">
+                                ${s.sales_goals ? s.sales_goals : '<span style="color:var(--text-muted);font-style:italic;">Sin metas</span>'}
+                            </td>
+                            <td style="padding: 15px 10px;">
+                                <button class="btn btn-outline" style="padding: 6px 12px; font-size:12px;" onclick="openEditGoalsModal(${s.id}, '${s.name.replace(/'/g, "\\'")}', '${(s.sales_goals || '').replace(/'/g, "\\'").replace(/\n/g, '\\n')}')">
+                                    <i class="ph ph-pencil-simple"></i> Editar Metas
+                                </button>
+                            </td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="4" style="padding: 15px 10px; text-align:center; color:var(--danger);">Error al cargar equipo.</td></tr>';
+                }
+            } catch(e) {
+                console.error(e);
+                tbody.innerHTML = '<tr><td colspan="4" style="padding: 15px 10px; text-align:center; color:var(--danger);">Error de conexión.</td></tr>';
+            }
+        }
+
+        function openEditGoalsModal(id, name, goals) {
+            document.getElementById('edit_goal_seller_id').value = id;
+            document.getElementById('edit_goal_seller_name').value = name;
+            document.getElementById('edit_goal_text').value = goals;
+            document.getElementById('modal-edit-goals').classList.remove('hidden');
+        }
+
+        async function saveSellerGoals() {
+            const id = document.getElementById('edit_goal_seller_id').value;
+            const newGoals = document.getElementById('edit_goal_text').value;
+            const btn = document.querySelector('#modal-edit-goals .btn');
+            
+            btn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Guardando...';
+            btn.disabled = true;
+
+            try {
+                const res = await fetch(`/seller/${id}/goals`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ sales_goals: newGoals })
+                });
+                if(res.ok) {
+                    document.getElementById('modal-edit-goals').classList.add('hidden');
+                    loadTeamData(); // reload
+                } else {
+                    alert("Error al guardar metas.");
+                }
+            } catch(e) {
+                alert("Error de red al guardar metas.");
+            }
+            btn.innerHTML = 'Guardar Metas';
+            btn.disabled = false;
+        }
 
     </script>
 </body>

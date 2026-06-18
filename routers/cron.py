@@ -271,3 +271,82 @@ async def cloud_task_callback(request: Request, db: Session = Depends(get_db)):
         return {"status": "ok"}
     else:
         return {"status": "failed", "message": "Failed to send WhatsApp message"}
+
+@router.post("/daily_plan")
+def daily_plan(db: Session = Depends(get_db)):
+    """
+    Triggered daily by Cloud Scheduler (e.g., 8:00 AM on workdays).
+    Reads the seller's sales_goals and generates a daily plan via Gemini.
+    """
+    users = db.query(User).filter(User.sales_goals.isnot(None), User.sales_goals != "").all()
+    results = []
+
+    today_str = datetime.utcnow().strftime("%Y-%m-%d")
+
+    for user in users:
+        if not user.phone_number:
+            continue
+            
+        logger.info(f"Generating daily plan for user {user.email}...")
+        
+        try:
+            refresh_token = user.get_refresh_token()
+        except Exception as e:
+            logger.error(f"Failed to decrypt token for daily plan of {user.email}: {str(e)}")
+            continue
+
+        prompt = (
+            f"Hola, eres el Sales Coach AI de {user.name}.\n"
+            f"Hoy es {today_str}. Las metas de venta de {user.name} son las siguientes:\n"
+            f"{user.sales_goals}\n\n"
+            "Por favor, redacta un plan de acción sugerido para HOY. Sé proactivo, motivador, y da 2 o 3 pasos claros "
+            "o tareas que el vendedor debe realizar hoy para acercarse a estas metas. "
+            "El mensaje no debe tener placeholders. El mensaje va directo al vendedor por WhatsApp."
+        )
+
+        agent = GeminiAgent(
+            user_refresh_token=refresh_token,
+            spreadsheet_id=user.spreadsheet_id,
+            template_doc_id=user.template_doc_id
+        )
+
+        plan_text, _ = agent.run([], prompt)
+
+        company_token = None
+        phone_id = None
+        if user.company_id:
+            company = db.query(Company).filter(Company.id == user.company_id).first()
+            if company:
+                company_token = company.get_whatsapp_token()
+                phone_id = company.whatsapp_phone_number_id
+
+        # We will use a generic template for proactive messaging
+        # E.g., 'daily_plan_template' with 1 body text parameter
+        components = [
+            {
+                "type": "body",
+                "parameters": [
+                    {"type": "text", "text": plan_text[:1024]} # limit text size if needed by Meta
+                ]
+            }
+        ]
+        
+        success = WhatsAppService.send_template_message(
+            to_phone=user.phone_number, 
+            template_name="daily_plan_template",
+            components=components,
+            token=company_token,
+            phone_id=phone_id
+        )
+
+        if success:
+            db_log = ConversationLog(phone_number=user.phone_number, sender="agent", message=plan_text)
+            db.add(db_log)
+            db.commit()
+
+        results.append({
+            "email": user.email,
+            "success": success
+        })
+
+    return {"status": "completed", "processed_users": results}
