@@ -3,6 +3,8 @@ import logging
 from typing import List, Dict, Any, Tuple, Optional
 from datetime import datetime
 import pytz
+from google.cloud import tasks_v2
+from google.protobuf import timestamp_pb2
 
 # Attempt to import vertexai; provide a fallback if it fails or is not authenticated
 try:
@@ -24,13 +26,14 @@ class GeminiAgent:
     Orchestrates Gemini tool calling and reasoning with Vertex AI.
     If Vertex AI is not initialized or fails, falls back to a simulated mock agent.
     """
-    def __init__(self, user_refresh_token: str, spreadsheet_id: Optional[str] = None, template_doc_id: Optional[str] = None, sales_goals: Optional[str] = None, objectives: Optional[str] = None, calendar_id: str = "primary"):
+    def __init__(self, user_refresh_token: str, spreadsheet_id: Optional[str] = None, template_doc_id: Optional[str] = None, sales_goals: Optional[str] = None, objectives: Optional[str] = None, calendar_id: str = "primary", phone_number: Optional[str] = None):
         self.refresh_token = user_refresh_token
         self.spreadsheet_id = spreadsheet_id
         self.template_doc_id = template_doc_id
         self.sales_goals = sales_goals
         self.objectives = objectives
         self.calendar_id = calendar_id
+        self.phone_number = phone_number
         self.vertex_initialized = False
 
         if VERTEX_AVAILABLE:
@@ -222,13 +225,52 @@ class GeminiAgent:
             except Exception as e:
                 return f"Error generating quotation: {str(e)}"
 
+        def schedule_followup(message: str, scheduled_time_iso: str) -> str:
+            """
+            Schedule a proactive message to be sent to the user via WhatsApp at a specific future time.
+            
+            Args:
+                message: The exact text message you want to send to the user.
+                scheduled_time_iso: The precise date and time to send the message, in ISO 8601 format (e.g. 2023-12-01T15:30:00-06:00).
+            """
+            if not self.phone_number:
+                return "Error: No phone number available to schedule the message."
+            try:
+                client = tasks_v2.CloudTasksClient()
+                parent = client.queue_path(settings.GCP_PROJECT_ID, settings.GCP_LOCATION, settings.CLOUD_TASKS_QUEUE)
+                
+                url = f"{settings.BASE_URL.rstrip('/')}/cron/cloud-task-callback"
+                payload = {"phone_number": self.phone_number, "message": message}
+                
+                task = {
+                    "http_request": {
+                        "http_method": tasks_v2.HttpMethod.POST,
+                        "url": url,
+                        "headers": {"Content-type": "application/json"},
+                        "body": json.dumps(payload).encode()
+                    }
+                }
+                
+                # Set schedule time
+                d = datetime.fromisoformat(scheduled_time_iso)
+                timestamp = timestamp_pb2.Timestamp()
+                timestamp.FromDatetime(d)
+                task["schedule_time"] = timestamp
+                
+                response = client.create_task(request={"parent": parent, "task": task})
+                return f"Follow-up message scheduled successfully. Task name: {response.name}"
+            except Exception as e:
+                logger.error(f"Error scheduling task: {str(e)}")
+                return f"Error scheduling task: {str(e)}"
+
         self.tools_map = {
             "list_calendar_events": list_calendar_events,
             "create_calendar_event": create_calendar_event,
             "update_calendar_event": update_calendar_event,
             "delete_calendar_event": delete_calendar_event,
             "read_crm_data": read_crm_data,
-            "generate_quotation": generate_quotation
+            "generate_quotation": generate_quotation,
+            "schedule_followup": schedule_followup
         }
         declarations = [FunctionDeclaration.from_func(func) for func in self.tools_map.values()]
         self.tools_list = Tool(function_declarations=declarations)

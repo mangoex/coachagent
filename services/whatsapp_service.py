@@ -60,6 +60,28 @@ class WhatsAppService:
         return cls._send_post_request(payload, token, phone_id)
 
     @classmethod
+    def send_template_message(cls, to_phone: str, template_name: str, language_code: str = "es_MX", components: Optional[List[Dict[str, Any]]] = None, token: Optional[str] = None, phone_id: Optional[str] = None) -> bool:
+        """
+        Sends a pre-approved template message to bypass the 24-hour window constraint.
+        """
+        payload = {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": to_phone,
+            "type": "template",
+            "template": {
+                "name": template_name,
+                "language": {
+                    "code": language_code
+                }
+            }
+        }
+        if components:
+            payload["template"]["components"] = components
+            
+        return cls._send_post_request(payload, token, phone_id)
+
+    @classmethod
     def send_document_message(cls, to_phone: str, document_url: str, filename: str, caption: Optional[str] = None, token: Optional[str] = None, phone_id: Optional[str] = None) -> bool:
         """
         Sends a document (e.g. a PDF quotation) via its URL.

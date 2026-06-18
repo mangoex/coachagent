@@ -477,6 +477,9 @@
                 <a class="nav-item" onclick="showAppView('company')" id="nav-company" style="display:none;">
                     <i class="ph ph-buildings"></i> Empresa
                 </a>
+                <a class="nav-item" onclick="showAppView('audit')" id="nav-audit">
+                    <i class="ph ph-shield-check"></i> Auditoría
+                </a>
             </nav>
             <div class="sidebar-footer">
                 <div class="user-profile">
@@ -677,6 +680,48 @@
                 </div>
             </div>
 
+        </main>
+        
+        <main class="main-content view-panel" id="view-audit">
+            <div class="view-header">
+                <button class="mobile-menu-btn" onclick="toggleSidebar()"><i class="ph ph-list"></i></button>
+                <div>
+                    <h1>Auditoría de Herramientas Google</h1>
+                    <p>Verifica que el agente tenga acceso a tu ecosistema Workspace</p>
+                </div>
+                <button class="btn" onclick="runAudit()"><i class="ph ph-arrows-clockwise"></i> Correr Auditoría</button>
+            </div>
+            
+            <div id="auditAlert" class="alert" style="margin-bottom: 20px;"></div>
+
+            <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                <!-- Calendar -->
+                <div class="card glass" style="flex:1; min-width: 250px;">
+                    <div class="card-header">
+                        <div class="card-title"><i class="ph ph-calendar"></i> Google Calendar</div>
+                    </div>
+                    <p id="audit_calendar_status" style="margin:10px 0; font-weight:bold;">Esperando auditoría...</p>
+                    <p id="audit_calendar_msg" style="color:var(--text-muted); font-size:13px;"></p>
+                </div>
+                
+                <!-- Sheets -->
+                <div class="card glass" style="flex:1; min-width: 250px;">
+                    <div class="card-header">
+                        <div class="card-title"><i class="ph ph-table"></i> Google Sheets (CRM)</div>
+                    </div>
+                    <p id="audit_sheets_status" style="margin:10px 0; font-weight:bold;">Esperando auditoría...</p>
+                    <p id="audit_sheets_msg" style="color:var(--text-muted); font-size:13px;"></p>
+                </div>
+
+                <!-- Docs -->
+                <div class="card glass" style="flex:1; min-width: 250px;">
+                    <div class="card-header">
+                        <div class="card-title"><i class="ph ph-file-text"></i> Google Docs (Plantillas)</div>
+                    </div>
+                    <p id="audit_docs_status" style="margin:10px 0; font-weight:bold;">Esperando auditoría...</p>
+                    <p id="audit_docs_msg" style="color:var(--text-muted); font-size:13px;"></p>
+                </div>
+            </div>
         </main>
         </div>
     </div>
@@ -1063,6 +1108,48 @@
             btn.innerHTML = '<i class="ph ph-floppy-disk"></i> Guardar Empresa';
             btn.disabled = false;
             setTimeout(() => { document.getElementById('companyAlert').style.display='none'; }, 3000);
+        }
+
+        async function runAudit() {
+            if (!window.sellerData || !window.sellerData.email) return;
+            const email = window.sellerData.email;
+            
+            showAlert('auditAlert', 'Ejecutando auditoría, por favor espera...', true);
+            
+            ['calendar', 'sheets', 'docs'].forEach(s => {
+                document.getElementById(`audit_${s}_status`).textContent = "Verificando...";
+                document.getElementById(`audit_${s}_msg`).textContent = "";
+            });
+
+            try {
+                const res = await fetch(`/api/audit/${email}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    document.getElementById('auditAlert').style.display = 'none';
+
+                    ['calendar', 'sheets', 'docs'].forEach(s => {
+                        const info = data[s];
+                        if(info) {
+                            const statusEl = document.getElementById(`audit_${s}_status`);
+                            if (info.status === 'ok') {
+                                statusEl.textContent = "✅ Conectado";
+                                statusEl.style.color = "var(--success)";
+                            } else if (info.status === 'warning') {
+                                statusEl.textContent = "⚠️ Advertencia";
+                                statusEl.style.color = "#fbbf24";
+                            } else {
+                                statusEl.textContent = "❌ Error";
+                                statusEl.style.color = "var(--error)";
+                            }
+                            document.getElementById(`audit_${s}_msg`).textContent = info.message;
+                        }
+                    });
+                } else {
+                    showAlert('auditAlert', 'Error al consultar la auditoría del servidor.', false);
+                }
+            } catch (e) {
+                showAlert('auditAlert', 'Error de conexión durante la auditoría.', false);
+            }
         }
 
     </script>

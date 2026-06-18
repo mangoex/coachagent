@@ -7,6 +7,8 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     GCP_PROJECT_ID: str = "my-gcp-project-id"
     GCP_LOCATION: str = "us-central1"
+    CLOUD_TASKS_QUEUE: str = "agent-queue"
+    BASE_URL: str = "https://your-cloud-run-url.a.run.app"
     
     # Encryption Key (Must be 32 URL-safe base64-encoded bytes for Fernet)
     ENCRYPTION_KEY: str = "zR_X_L8h_R64bJvFpQ3DfZ-YkC84e2c1eQ-F89x1a2A="

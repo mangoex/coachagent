@@ -1,11 +1,11 @@
-from fastapi import APIRouter, Depends, status, HTTPException
+from fastapi import APIRouter, Depends, status, HTTPException, Request
 from sqlalchemy.orm import Session
 import logging
 from datetime import datetime
 import json
 
 from database.connection import get_db
-from database.models import User, ConversationLog
+from database.models import User, ConversationLog, Company
 from services.calendar_service import GoogleCalendarService
 from services.sheets_service import GoogleSheetsService
 from services.whatsapp_service import WhatsAppService
@@ -86,8 +86,33 @@ def morning_briefing(db: Session = Depends(get_db)):
         # Generate briefing text
         briefing_text, _ = agent.run([], prompt)
 
-        # 4. Send briefing via WhatsApp
-        success = WhatsAppService.send_text_message(user.phone_number, briefing_text)
+        # Get company credentials if the user belongs to one
+        company_token = None
+        phone_id = None
+        if user.company_id:
+            company = db.query(Company).filter(Company.id == user.company_id).first()
+            if company:
+                company_token = company.get_whatsapp_token()
+                phone_id = company.whatsapp_phone_number_id
+
+        # 4. Send briefing via WhatsApp (Using Template for Proactive Message)
+        components = [
+            {
+                "type": "body",
+                "parameters": [
+                    {"type": "text", "text": briefing_text}
+                ]
+            }
+        ]
+        
+        # Replace 'morning_briefing' with the actual template name registered in Meta
+        success = WhatsAppService.send_template_message(
+            to_phone=user.phone_number, 
+            template_name="morning_briefing",
+            components=components,
+            token=company_token,
+            phone_id=phone_id
+        )
 
         # Log agent response in DB
         db_log = ConversationLog(phone_number=user.phone_number, sender="agent", message=briefing_text)
@@ -139,8 +164,16 @@ def evening_accountability(db: Session = Depends(get_db)):
             results.append({"email": user.email, "status": "no_meetings_today"})
             continue
 
+        # Get company credentials if the user belongs to one
+        company_token = None
+        phone_id = None
+        if user.company_id:
+            company = db.query(Company).filter(Company.id == user.company_id).first()
+            if company:
+                company_token = company.get_whatsapp_token()
+                phone_id = company.whatsapp_phone_number_id
+
         # Find the most important or first meeting to audit
-        # For simplicity, audit the last meeting of the day
         audit_meeting = events[-1]
         meeting_id = audit_meeting["id"]
         meeting_summary = audit_meeting["summary"]
@@ -159,15 +192,24 @@ def evening_accountability(db: Session = Depends(get_db)):
 
         # Construct interactive WhatsApp message with Yes/No buttons
         body_text = f"Hola {user.name}, ¿cómo te fue en tu junta de hoy: '{meeting_summary}'? ¿Se realizó la reunión?"
-        buttons = [
-            {"id": f"btn_yes_{meeting_id}", "title": "Sí, se realizó"},
-            {"id": f"btn_no_{meeting_id}", "title": "No se realizó"}
+        
+        # Proactive evening check using template
+        components = [
+            {
+                "type": "body",
+                "parameters": [
+                    {"type": "text", "text": body_text}
+                ]
+            }
         ]
 
-        success = WhatsAppService.send_interactive_buttons(
+        # Replace 'evening_accountability' with the actual template name registered in Meta
+        success = WhatsAppService.send_template_message(
             to_phone=user.phone_number,
-            body_text=body_text,
-            buttons=buttons
+            template_name="evening_accountability",
+            components=components,
+            token=company_token,
+            phone_id=phone_id
         )
 
         # Log agent message to DB
@@ -183,3 +225,49 @@ def evening_accountability(db: Session = Depends(get_db)):
         })
 
     return {"status": "completed", "processed_users": results}
+
+@router.post("/cloud-task-callback")
+async def cloud_task_callback(request: Request, db: Session = Depends(get_db)):
+    """
+    Webhook target for Google Cloud Tasks for dynamic scheduled messages.
+    """
+    body = await request.json()
+    phone_number = body.get("phone_number")
+    message = body.get("message")
+    
+    if not phone_number or not message:
+        return {"status": "error", "message": "Missing phone_number or message"}
+        
+    user = db.query(User).filter(User.phone_number == phone_number).first()
+    if not user:
+        return {"status": "error", "message": "User not found"}
+        
+    # Get company credentials if the user belongs to one
+    company_token = None
+    phone_id = None
+    if user.company_id:
+        company = db.query(Company).filter(Company.id == user.company_id).first()
+        if company:
+            company_token = company.get_whatsapp_token()
+            phone_id = company.whatsapp_phone_number_id
+
+    # For dynamic messages, we need a generic template or standard text if 24hr window is active
+    # We will try sending a text message first (works if 24h window active), 
+    # and if it fails or if we want to be safe, we could use a generic notification template.
+    # For now, let's use send_text_message assuming the agent scheduled this within the 24h window,
+    # or the user can configure a generic template.
+    
+    success = WhatsAppService.send_text_message(
+        to_phone=user.phone_number,
+        text=message,
+        token=company_token,
+        phone_id=phone_id
+    )
+    
+    if success:
+        db_log = ConversationLog(phone_number=user.phone_number, sender="agent", message=message)
+        db.add(db_log)
+        db.commit()
+        return {"status": "ok"}
+    else:
+        return {"status": "failed", "message": "Failed to send WhatsApp message"}

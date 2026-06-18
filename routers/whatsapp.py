@@ -175,7 +175,8 @@ async def receive_message(request: Request, db: Session = Depends(get_db)):
         template_doc_id=user.template_doc_id,
         sales_goals=user.sales_goals,
         objectives=user.objectives,
-        calendar_id=user.calendar_id
+        calendar_id=user.calendar_id,
+        phone_number=from_phone
     )
 
     # Run agent cycle (includes tool executions)

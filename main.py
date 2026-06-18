@@ -15,7 +15,7 @@ from database.connection import Base, engine, get_db
 from database.models import User, ConversationLog, Company
 from agent.redis_memory import redis_memory
 from agent.gemini_agent import GeminiAgent
-from routers import whatsapp, cron
+from routers import whatsapp, cron, audit
 from config.settings import settings
 from services.calendar_service import GoogleCalendarService
 
@@ -82,6 +82,7 @@ def startup_event():
 # Include Routers
 app.include_router(whatsapp.router)
 app.include_router(cron.router)
+app.include_router(audit.router)
 
 # Pydantic schemas
 class CompanyCreate(BaseModel):

@@ -1,0 +1,240 @@
+[
+  {
+    "insertId": "-nkfaj5dnnhk",
+    "logName": "projects/coach-agent-499614/logs/cloudaudit.googleapis.com%2Fsystem_event",
+    "protoPayload": {
+      "@type": "type.googleapis.com/google.cloud.audit.AuditLog",
+      "methodName": "/Services.ReplaceService",
+      "resourceName": "namespaces/coach-agent-499614/revisions/coachagent-service-00037-r9h",
+      "response": {
+        "@type": "type.googleapis.com/google.cloud.run.v1.Revision",
+        "apiVersion": "serving.knative.dev/v1",
+        "kind": "Revision",
+        "metadata": {
+          "annotations": {
+            "autoscaling.knative.dev/maxScale": "20",
+            "run.googleapis.com/client-name": "gcloud",
+            "run.googleapis.com/client-version": "573.0.0",
+            "run.googleapis.com/cloudsql-instances": "coach-agent-499614:us-central1:coachagent-postgres",
+            "run.googleapis.com/operation-id": "d03a0a96-fdb6-40bf-a88f-dd87df693557",
+            "run.googleapis.com/startup-cpu-boost": "true",
+            "serving.knative.dev/creator": "551178162091-compute@developer.gserviceaccount.com"
+          },
+          "creationTimestamp": "2026-06-17T20:40:28.051862Z",
+          "generation": 1,
+          "labels": {
+            "client.knative.dev/nonce": "exvvzmbpph",
+            "cloud.googleapis.com/location": "us-central1",
+            "run.googleapis.com/startupProbeType": "Default",
+            "serving.knative.dev/configuration": "coachagent-service",
+            "serving.knative.dev/configurationGeneration": "37",
+            "serving.knative.dev/route": "coachagent-service",
+            "serving.knative.dev/service": "coachagent-service",
+            "serving.knative.dev/serviceUid": "9a6c6cf7-9300-4501-8ec5-5258345067af"
+          },
+          "name": "coachagent-service-00037-r9h",
+          "namespace": "551178162091",
+          "ownerReferences": [
+            {
+              "apiVersion": "serving.knative.dev/v1",
+              "blockOwnerDeletion": true,
+              "controller": true,
+              "kind": "Configuration",
+              "name": "coachagent-service",
+              "uid": "564eb7b0-c87a-4cc1-a641-8a06b89128c4"
+            }
+          ],
+          "resourceVersion": "AAZUeRXsYBk",
+          "selfLink": "/apis/serving.knative.dev/v1/namespaces/551178162091/revisions/coachagent-service-00037-r9h",
+          "uid": "ad706f2d-3fd7-4cc6-b08e-989a29e17b6a"
+        },
+        "spec": {
+          "containerConcurrency": 80,
+          "containers": [
+            {
+              "env": [
+                {
+                  "name": "ENVIRONMENT",
+                  "value": "production"
+                },
+                {
+                  "name": "GCP_PROJECT_ID",
+                  "value": "coach-agent-499614"
+                },
+                {
+                  "name": "GCP_LOCATION",
+                  "value": "us-central1"
+                },
+                {
+                  "name": "DATABASE_URL",
+                  "valueFrom": {
+                    "secretKeyRef": {
+                      "key": "latest",
+                      "name": "COACHAGENT_DATABASE_URL"
+                    }
+                  }
+                },
+                {
+                  "name": "ENCRYPTION_KEY",
+                  "valueFrom": {
+                    "secretKeyRef": {
+                      "key": "latest",
+                      "name": "COACHAGENT_ENCRYPTION_KEY"
+                    }
+                  }
+                },
+                {
+                  "name": "REDIS_URL",
+                  "valueFrom": {
+                    "secretKeyRef": {
+                      "key": "latest",
+                      "name": "COACHAGENT_REDIS_URL"
+                    }
+                  }
+                },
+                {
+                  "name": "WHATSAPP_TOKEN",
+                  "valueFrom": {
+                    "secretKeyRef": {
+                      "key": "latest",
+                      "name": "COACHAGENT_WHATSAPP_TOKEN"
+                    }
+                  }
+                },
+                {
+                  "name": "WHATSAPP_PHONE_NUMBER_ID",
+                  "valueFrom": {
+                    "secretKeyRef": {
+                      "key": "latest",
+                      "name": "COACHAGENT_WHATSAPP_PHONE_NUMBER_ID"
+                    }
+                  }
+                },
+                {
+                  "name": "WHATSAPP_VERIFY_TOKEN",
+                  "valueFrom": {
+                    "secretKeyRef": {
+                      "key": "latest",
+                      "name": "COACHAGENT_WHATSAPP_VERIFY_TOKEN"
+                    }
+                  }
+                },
+                {
+                  "name": "GCS_BUCKET_NAME",
+                  "valueFrom": {
+                    "secretKeyRef": {
+                      "key": "latest",
+                      "name": "COACHAGENT_GCS_BUCKET_NAME"
+                    }
+                  }
+                },
+                {
+                  "name": "GOOGLE_CLIENT_ID",
+                  "valueFrom": {
+                    "secretKeyRef": {
+                      "key": "latest",
+                      "name": "COACHAGENT_GOOGLE_CLIENT_ID"
+                    }
+                  }
+                },
+                {
+                  "name": "GOOGLE_CLIENT_SECRET",
+                  "valueFrom": {
+                    "secretKeyRef": {
+                      "key": "latest",
+                      "name": "COACHAGENT_GOOGLE_CLIENT_SECRET"
+                    }
+                  }
+                }
+              ],
+              "image": "us-central1-docker.pkg.dev/coach-agent-499614/coachagent-repo/coachagent-service@sha256:cd6cccabbb827ac39b0fba9be368d3afccadabed13598cacfaab3e192279a808",
+              "name": "coachagent-service-1",
+              "ports": [
+                {
+                  "containerPort": 8080,
+                  "name": "http1"
+                }
+              ],
+              "resources": {
+                "limits": {
+                  "cpu": "1000m",
+                  "memory": "512Mi"
+                }
+              },
+              "startupProbe": {
+                "failureThreshold": 1,
+                "periodSeconds": 240,
+                "tcpSocket": {
+                  "port": 8080
+                },
+                "timeoutSeconds": 240
+              }
+            }
+          ],
+          "serviceAccountName": "551178162091-compute@developer.gserviceaccount.com",
+          "timeoutSeconds": 300
+        },
+        "status": {
+          "conditions": [
+            {
+              "lastTransitionTime": "2026-06-17T20:41:35.852569Z",
+              "message": "Deploying revision succeeded in 1m7.8s.",
+              "status": "True",
+              "type": "Ready"
+            },
+            {
+              "lastTransitionTime": "2026-06-17T20:41:12.366001Z",
+              "severity": "Info",
+              "status": "True",
+              "type": "Active"
+            },
+            {
+              "lastTransitionTime": "2026-06-17T20:41:11.070992Z",
+              "message": "Containers became healthy in 21.24s.",
+              "status": "True",
+              "type": "ContainerHealthy"
+            },
+            {
+              "lastTransitionTime": "2026-06-17T20:40:48.028639Z",
+              "message": "Container image import completed in 19.18s.",
+              "status": "True",
+              "type": "ContainerReady"
+            },
+            {
+              "lastTransitionTime": "2026-06-17T20:40:50.106571Z",
+              "message": "Provisioning imported containers completed in 2.08s. Checking container health. This will wait for up to 4m for the configured startup probe, including an initial delay of 0s.",
+              "status": "True",
+              "type": "ResourcesAvailable"
+            }
+          ],
+          "containerStatuses": [
+            {
+              "imageDigest": "us-central1-docker.pkg.dev/coach-agent-499614/coachagent-repo/coachagent-service@sha256:cd6cccabbb827ac39b0fba9be368d3afccadabed13598cacfaab3e192279a808",
+              "name": "coachagent-service-1"
+            }
+          ],
+          "imageDigest": "us-central1-docker.pkg.dev/coach-agent-499614/coachagent-repo/coachagent-service@sha256:cd6cccabbb827ac39b0fba9be368d3afccadabed13598cacfaab3e192279a808",
+          "logUrl": "https://console.cloud.google.com/logs/viewer?project=coach-agent-499614&resource=cloud_run_revision/service_name/coachagent-service/revision_name/coachagent-service-00037-r9h&advancedFilter=resource.type%3D%22cloud_run_revision%22%0Aresource.labels.service_name%3D%22coachagent-service%22%0Aresource.labels.revision_name%3D%22coachagent-service-00037-r9h%22",
+          "observedGeneration": 1
+        }
+      },
+      "serviceName": "run.googleapis.com",
+      "status": {
+        "message": "Ready condition status changed to True for Revision coachagent-service-00037-r9h with message: Deploying revision succeeded in 1m7.8s."
+      }
+    },
+    "receiveTimestamp": "2026-06-17T20:41:36.134326961Z",
+    "resource": {
+      "labels": {
+        "configuration_name": "coachagent-service",
+        "location": "us-central1",
+        "project_id": "coach-agent-499614",
+        "revision_name": "coachagent-service-00037-r9h",
+        "service_name": "coachagent-service"
+      },
+      "type": "cloud_run_revision"
+    },
+    "severity": "INFO",
+    "timestamp": "2026-06-17T20:41:35.863362Z"
+  }
+]
