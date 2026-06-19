@@ -821,7 +821,10 @@
                         <h2>Mi Equipo</h2>
                         <p>Administra los vendedores de tu empresa y sus metas</p>
                     </div>
-                    <button class="btn btn-outline" onclick="loadTeamData()"><i class="ph ph-arrows-clockwise"></i> Refrescar</button>
+                    <div style="display:flex; gap:10px;">
+                        <button class="btn btn-outline" onclick="loadTeamData()"><i class="ph ph-arrows-clockwise"></i> Refrescar</button>
+                        <button class="btn" onclick="document.getElementById('modal-add-seller').classList.remove('hidden')"><i class="ph ph-plus"></i> Invitar Vendedor</button>
+                    </div>
                 </div>
 
                 <div class="card glass">
@@ -847,6 +850,34 @@
             </div>
 
         </main>
+        </div>
+    </div>
+
+    <!-- Add Seller Modal -->
+    <div id="modal-add-seller" class="hidden" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:9999; display:flex; align-items:center; justify-content:center;">
+        <div class="card glass" style="width:90%; max-width:500px;">
+            <div class="card-header">
+                <div class="card-title">Pre-registrar Vendedor</div>
+                <button class="btn-outline" style="border:none; color:white;" onclick="document.getElementById('modal-add-seller').classList.add('hidden')"><i class="ph ph-x"></i></button>
+            </div>
+            <div class="form-group">
+                <label>Nombre del Vendedor</label>
+                <input type="text" id="add_seller_name" placeholder="Ej. Juan Pérez">
+            </div>
+            <div class="form-group">
+                <label>Correo Electrónico</label>
+                <input type="email" id="add_seller_email" placeholder="juan@empresa.com">
+                <p style="font-size:11px; color:var(--text-muted); margin-top:4px;">El vendedor usará este correo para registrarse e ingresar al sistema.</p>
+            </div>
+            <div class="form-group">
+                <label>Teléfono (WhatsApp)</label>
+                <input type="text" id="add_seller_phone" placeholder="Ej. 526672013020">
+            </div>
+            <div class="form-group">
+                <label>Metas de Venta Iniciales</label>
+                <textarea id="add_seller_goals" rows="3" placeholder="Metas que el asistente usará para evaluar al vendedor..."></textarea>
+            </div>
+            <button class="btn" style="width:100%; margin-top:10px;" onclick="addSeller()">Registrar Vendedor</button>
         </div>
     </div>
 
@@ -1411,6 +1442,60 @@
             setTimeout(() => { document.getElementById('companyAlert').style.display='none'; }, 3000);
         }
 
+
+        async function addSeller() {
+            if(!window.sellerData || !window.sellerData.company_code) return;
+            
+            const name = document.getElementById('add_seller_name').value;
+            const email = document.getElementById('add_seller_email').value;
+            const phone = document.getElementById('add_seller_phone').value;
+            const goals = document.getElementById('add_seller_goals').value;
+
+            if(!name || !email || !phone) {
+                alert("Nombre, Correo y Teléfono son obligatorios.");
+                return;
+            }
+
+            const payload = {
+                name: name,
+                phone_number: phone,
+                email: email,
+                sales_goals: goals,
+                objectives: ""
+            };
+
+            const btn = document.querySelector('#modal-add-seller .btn');
+            btn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Registrando...';
+            btn.disabled = true;
+
+            try {
+                const res = await fetch(`/companies/${window.sellerData.company_code}/sellers`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if(res.ok) {
+                    alert("Vendedor pre-registrado correctamente.");
+                    document.getElementById('modal-add-seller').classList.add('hidden');
+                    
+                    // Clear form
+                    document.getElementById('add_seller_name').value = '';
+                    document.getElementById('add_seller_email').value = '';
+                    document.getElementById('add_seller_phone').value = '';
+                    document.getElementById('add_seller_goals').value = '';
+                    
+                    loadTeamData();
+                } else {
+                    alert(data.detail || "Error al pre-registrar vendedor.");
+                }
+            } catch(e) {
+                alert("Error de conexión al registrar vendedor.");
+            }
+            
+            btn.innerHTML = 'Registrar Vendedor';
+            btn.disabled = false;
+        }
 
         async function loadTeamData() {
             if(!window.sellerData || !window.sellerData.company_code) {
