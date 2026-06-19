@@ -9,6 +9,36 @@ class GoogleCalendarService:
         creds = get_user_credentials(refresh_token)
         return build("calendar", "v3", credentials=creds)
     @classmethod
+    def get_calendar_metadata(cls, refresh_token: str, calendar_id: str = "primary") -> Dict[str, Any]:
+        """
+        Fetch calendar metadata (timeZone, defaultReminders) from the API.
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        try:
+            service = cls._get_calendar_client(refresh_token)
+            calendar_entry = service.calendarList().get(calendarId=calendar_id).execute()
+            return {
+                "timeZone": calendar_entry.get("timeZone", "America/Mexico_City"),
+                "defaultReminders": calendar_entry.get("defaultReminders", [])
+            }
+        except Exception as e:
+            logger.error(f"Error fetching calendarList metadata: {str(e)}")
+            try:
+                service = cls._get_calendar_client(refresh_token)
+                calendar = service.calendars().get(calendarId=calendar_id).execute()
+                return {
+                    "timeZone": calendar.get("timeZone", "America/Mexico_City"),
+                    "defaultReminders": []
+                }
+            except Exception as e2:
+                logger.error(f"Error fetching calendar resource fallback: {str(e2)}")
+                return {
+                    "timeZone": "America/Mexico_City",
+                    "defaultReminders": []
+                }
+
+    @classmethod
     def list_calendars(cls, refresh_token: str) -> List[Dict[str, str]]:
         """
         List all calendars available to the user.
@@ -115,11 +145,16 @@ class GoogleCalendarService:
         """
         service = cls._get_calendar_client(refresh_token)
         
+        # Fetch metadata dynamically
+        metadata = cls.get_calendar_metadata(refresh_token, calendar_id)
+        tz = metadata.get("timeZone", "America/Mexico_City")
+        default_reminders = metadata.get("defaultReminders", [])
+        
         event_body = {
             "summary": summary,
             "description": description or "Creado por Google AI Sales Coach Agent",
-            "start": {"dateTime": start_time_iso, "timeZone": "America/Mexico_City"},
-            "end": {"dateTime": end_time_iso, "timeZone": "America/Mexico_City"},
+            "start": {"dateTime": start_time_iso, "timeZone": tz},
+            "end": {"dateTime": end_time_iso, "timeZone": tz},
         }
         
         if attendees:
@@ -128,7 +163,14 @@ class GoogleCalendarService:
         if reminders is not None:
             event_body["reminders"] = reminders
         else:
-            event_body["reminders"] = {"useDefault": True}
+            if default_reminders:
+                event_body["reminders"] = {"useDefault": True}
+            else:
+                # If calendar has absolutely no default notifications, set a fallback popup reminder
+                event_body["reminders"] = {
+                    "useDefault": False,
+                    "overrides": [{"method": "popup", "minutes": 15}]
+                }
 
         created_event = service.events().insert(
             calendarId=calendar_id,
@@ -162,6 +204,10 @@ class GoogleCalendarService:
         """
         service = cls._get_calendar_client(refresh_token)
         
+        # Fetch metadata dynamically for timezone
+        metadata = cls.get_calendar_metadata(refresh_token, calendar_id)
+        tz = metadata.get("timeZone", "America/Mexico_City")
+
         # Get existing event first to merge updates
         event = service.events().get(calendarId=calendar_id, eventId=event_id).execute()
 
@@ -170,9 +216,9 @@ class GoogleCalendarService:
         if description is not None:
             event["description"] = description
         if start_time_iso is not None:
-            event["start"] = {"dateTime": start_time_iso}
+            event["start"] = {"dateTime": start_time_iso, "timeZone": tz}
         if end_time_iso is not None:
-            event["end"] = {"dateTime": end_time_iso}
+            event["end"] = {"dateTime": end_time_iso, "timeZone": tz}
         if attendees is not None:
             event["attendees"] = [{"email": email} for email in attendees]
         if reminders is not None:

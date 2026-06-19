@@ -51,8 +51,17 @@ class GeminiAgent:
                     "Mantén un tono profesional, motivador, conciso y enfocado a objetivos comerciales. Responde en español.\n"
                 )
                 
-                # Inyectar fecha y hora actual para evitar alucinaciones
-                tz = pytz.timezone('America/Mexico_City')
+                # Inyectar fecha y hora actual para evitar alucinaciones en base a la zona horaria del calendario del usuario
+                try:
+                    cal_tz = "America/Mexico_City"
+                    if self.refresh_token:
+                        metadata = GoogleCalendarService.get_calendar_metadata(self.refresh_token, self.calendar_id)
+                        cal_tz = metadata.get("timeZone", "America/Mexico_City")
+                    tz = pytz.timezone(cal_tz)
+                except Exception as e:
+                    logger.warning(f"Could not resolve dynamic timezone, falling back to America/Mexico_City: {e}")
+                    tz = pytz.timezone('America/Mexico_City')
+
                 now = datetime.now(tz)
                 self.system_instruction += f"\n[Contexto del Sistema]\nHoy es: {now.strftime('%A, %d de %B de %Y')}.\nLa hora actual es: {now.strftime('%H:%M %Z')}.\n"
                 self.system_instruction += "Toma en cuenta esta fecha y hora para todas tus acciones (por ejemplo, 'mañana a las 7am' o 'hoy a las 6pm'). Las fechas en las herramientas deben ir en formato ISO 8601.\n"
