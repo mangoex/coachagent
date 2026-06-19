@@ -234,7 +234,7 @@
 
         .form-group { margin-bottom: 20px; }
         label { display: block; font-size: 13px; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;}
-        input, select {
+        input, select, textarea {
             width: 100%;
             background: rgba(0, 0, 0, 0.2);
             border: 1px solid var(--card-border);
@@ -245,8 +245,9 @@
             font-size: 15px;
             outline: none;
             transition: var(--transition);
+            resize: vertical;
         }
-        input:focus, select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(124, 77, 255, 0.2); }
+        input:focus, select:focus, textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(124, 77, 255, 0.2); }
         
         .alert { padding: 16px; border-radius: 12px; margin-top: 15px; font-size: 14px; display: none; display: flex; align-items: center; gap: 10px; }
         .alert i { font-size: 20px; }
@@ -873,10 +874,6 @@
                 <label>Teléfono (WhatsApp)</label>
                 <input type="text" id="add_seller_phone" placeholder="Ej. 526672013020">
             </div>
-            <div class="form-group">
-                <label>Metas de Venta Iniciales</label>
-                <textarea id="add_seller_goals" rows="3" placeholder="Metas que el asistente usará para evaluar al vendedor..."></textarea>
-            </div>
             <button class="btn" style="width:100%; margin-top:10px;" onclick="addSeller()">Registrar Vendedor</button>
         </div>
     </div>
@@ -1449,7 +1446,6 @@
             const name = document.getElementById('add_seller_name').value;
             const email = document.getElementById('add_seller_email').value;
             const phone = document.getElementById('add_seller_phone').value;
-            const goals = document.getElementById('add_seller_goals').value;
 
             if(!name || !email || !phone) {
                 alert("Nombre, Correo y Teléfono son obligatorios.");
@@ -1460,7 +1456,7 @@
                 name: name,
                 phone_number: phone,
                 email: email,
-                sales_goals: goals,
+                sales_goals: "",
                 objectives: ""
             };
 
@@ -1483,7 +1479,6 @@
                     document.getElementById('add_seller_name').value = '';
                     document.getElementById('add_seller_email').value = '';
                     document.getElementById('add_seller_phone').value = '';
-                    document.getElementById('add_seller_goals').value = '';
                     
                     loadTeamData();
                 } else {
