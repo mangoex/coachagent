@@ -640,6 +640,23 @@
                     </div>
                 </div>
 
+                <div class="card glass" style="margin-top: 20px; border-left: 4px solid #6366f1;">
+                    <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+                        <div class="card-title"><i class="ph ph-target"></i> Mis Metas y Estrategia de Venta</div>
+                        <button class="btn" style="font-size: 12px; padding: 6px 12px; background: linear-gradient(135deg, #6366f1, #a855f7); border: none;" onclick="openSellerGoalsWizard()"><i class="ph-fill ph-magic-wand"></i> Asistente de Metas IA</button>
+                    </div>
+                    <div style="padding: 20px; display: grid; grid-template-columns: 1fr; gap: 15px;">
+                        <div>
+                            <h4 style="color:var(--text-muted); font-size:12px; text-transform:uppercase; letter-spacing:1px; margin-bottom:5px;">Meta de Ventas Activa</h4>
+                            <div id="dash_sales_goals_display" style="font-size: 15px; line-height: 1.6; color: var(--text-main); white-space: pre-wrap; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.05);">Cargando tus metas...</div>
+                        </div>
+                        <div>
+                            <h4 style="color:var(--text-muted); font-size:12px; text-transform:uppercase; letter-spacing:1px; margin-bottom:5px;">Objetivos y Enfoque del Coach</h4>
+                            <div id="dash_objectives_display" style="font-size: 15px; line-height: 1.6; color: var(--text-main); white-space: pre-wrap; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.05);">Cargando objetivos...</div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="card glass" style="margin-top: 20px; border-left: 4px solid var(--primary);">
                     <div class="card-header">
                         <div class="card-title"><i class="ph ph-calendar-check"></i> Próximos Compromisos (7 días)</div>
@@ -976,6 +993,97 @@
         </div>
     </div>
 
+    <!-- AI Goals Wizard Modal -->
+    <div id="modal-goals-wizard" class="hidden" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:9999; display:flex; align-items:center; justify-content:center;">
+        <div class="card glass" style="width:95%; max-width:600px; padding: 30px; max-height: 90vh; overflow-y: auto;">
+            <div class="card-header" style="margin-bottom: 20px;">
+                <div class="card-title" style="font-size: 20px;"><i class="ph ph-magic-wand"></i> Asistente de Metas IA</div>
+                <button class="btn-outline" style="border:none; color:white; font-size: 20px;" onclick="closeSellerGoalsWizard()"><i class="ph ph-x"></i></button>
+            </div>
+            
+            <!-- Wizard Steps Progress Bar -->
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 25px; padding: 0 10px;">
+                <div class="wizard-step-indicator active" id="indicator-step-1" style="width: 20px; height: 20px; border-radius: 50%; background: var(--primary); display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:bold;">1</div>
+                <div style="flex:1; height:2px; background: rgba(255,255,255,0.1); margin: 0 10px;" id="line-step-1"></div>
+                <div class="wizard-step-indicator" id="indicator-step-2" style="width: 20px; height: 20px; border-radius: 50%; background: rgba(255,255,255,0.1); display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:bold;">2</div>
+                <div style="flex:1; height:2px; background: rgba(255,255,255,0.1); margin: 0 10px;" id="line-step-2"></div>
+                <div class="wizard-step-indicator" id="indicator-step-3" style="width: 20px; height: 20px; border-radius: 50%; background: rgba(255,255,255,0.1); display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:bold;">3</div>
+                <div style="flex:1; height:2px; background: rgba(255,255,255,0.1); margin: 0 10px;" id="line-step-3"></div>
+                <div class="wizard-step-indicator" id="indicator-step-4" style="width: 20px; height: 20px; border-radius: 50%; background: rgba(255,255,255,0.1); display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:bold;">4</div>
+            </div>
+
+            <!-- STEP 1: Product / Service -->
+            <div id="wizard-step-1-content" class="wizard-step-content">
+                <h3 style="margin-bottom:10px; font-size:18px;">¿Qué vendes?</h3>
+                <p style="color:var(--text-muted); font-size:14px; margin-bottom:20px;">Describe brevemente el producto o servicio que comercializas.</p>
+                <div class="form-group">
+                    <input type="text" id="wizard_product_service" class="input" placeholder="Ej. Diseño de interiores, Licencia Software CRM, Consultas médicas..." style="padding:15px; border-radius:10px;">
+                </div>
+            </div>
+
+            <!-- STEP 2: Average Ticket -->
+            <div id="wizard-step-2-content" class="wizard-step-content hidden">
+                <h3 style="margin-bottom:10px; font-size:18px;">¿Cuál es tu ticket promedio?</h3>
+                <p style="color:var(--text-muted); font-size:14px; margin-bottom:20px;">Ingresa el precio promedio o valor de una venta concretada (en MXN).</p>
+                <div class="form-group">
+                    <input type="number" id="wizard_ticket_average" class="input" placeholder="Ej. 15000" style="padding:15px; border-radius:10px;">
+                </div>
+            </div>
+
+            <!-- STEP 3: Target Income -->
+            <div id="wizard-step-3-content" class="wizard-step-content hidden">
+                <h3 style="margin-bottom:10px; font-size:18px;">¿Cuánto quieres ganar?</h3>
+                <p style="color:var(--text-muted); font-size:14px; margin-bottom:20px;">Indica tu meta de ingreso mensual neto deseado (en MXN).</p>
+                <div class="form-group">
+                    <input type="number" id="wizard_target_income" class="input" placeholder="Ej. 50000" style="padding:15px; border-radius:10px;">
+                </div>
+            </div>
+
+            <!-- STEP 4: Custom Goals / Notes -->
+            <div id="wizard-step-4-content" class="wizard-step-content hidden">
+                <h3 style="margin-bottom:10px; font-size:18px;">¿Tienes alguna meta específica? (Opcional)</h3>
+                <p style="color:var(--text-muted); font-size:14px; margin-bottom:20px;">Si ya sabes qué quieres lograr, o tienes requerimientos particulares, escríbelos aquí.</p>
+                <div class="form-group">
+                    <textarea id="wizard_custom_goal" class="input" rows="4" placeholder="Ej. Quiero cerrar al menos 2 clientes de $25k al mes..." style="padding:15px; border-radius:10px; resize:vertical;"></textarea>
+                </div>
+            </div>
+
+            <!-- STEP 5: AI Suggestion Preview -->
+            <div id="wizard-step-5-content" class="wizard-step-content hidden">
+                <h3 style="margin-bottom:10px; font-size:18px; color: var(--primary);">¡Propuesta Calculada por el Coach de IA!</h3>
+                <p style="color:var(--text-muted); font-size:14px; margin-bottom:20px;">Esto es lo que calculó la IA en base a tus ingresos y ticket promedio.</p>
+                
+                <div class="form-group" style="margin-bottom:15px;">
+                    <label style="color:var(--text-muted); font-size:12px; text-transform:uppercase; letter-spacing:1px; display:block; margin-bottom:5px;">Meta de Ventas Propuesta</label>
+                    <textarea id="wizard_preview_sales_goals" class="input" rows="3" style="font-size:14px; line-height:1.5; padding:12px; border-radius:8px; background:rgba(0,0,0,0.3); resize:vertical;"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label style="color:var(--text-muted); font-size:12px; text-transform:uppercase; letter-spacing:1px; display:block; margin-bottom:5px;">Directrices para el Coach (Estrategia)</label>
+                    <textarea id="wizard_preview_objectives" class="input" rows="5" style="font-size:14px; line-height:1.5; padding:12px; border-radius:8px; background:rgba(0,0,0,0.3); resize:vertical;"></textarea>
+                </div>
+            </div>
+
+            <!-- Loader -->
+            <div id="wizard-loader" class="hidden" style="text-align:center; padding: 30px 0;">
+                <i class="ph ph-spinner ph-spin" style="font-size: 36px; color: var(--primary); margin-bottom: 15px; display:inline-block;"></i>
+                <p style="color:var(--text-main); font-weight:600;">Procesando cálculos financieros...</p>
+                <p style="color:var(--text-muted); font-size:13px; margin-top:5px;">Estimando tasas de conversión y estructurando actividades.</p>
+            </div>
+
+            <!-- Footer Controls -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 30px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 20px;" id="wizard-footer">
+                <button class="btn btn-outline" id="btn-wizard-prev" onclick="wizardPrevStep()" disabled>Anterior</button>
+                <div style="display:flex; gap:10px;">
+                    <button class="btn btn-outline" onclick="closeSellerGoalsWizard()">Cancelar</button>
+                    <button class="btn" id="btn-wizard-next" onclick="wizardNextStep()">Siguiente</button>
+                    <button class="btn hidden" id="btn-wizard-apply" onclick="applyWizardGoals()" style="background: linear-gradient(135deg, #6366f1, #a855f7); border:none;"><i class="ph ph-check-square"></i> Guardar y Aplicar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
     <!-- View Agenda Modal -->
     <div id="modal-agenda" class="hidden" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:9999; display:flex; align-items:center; justify-content:center;">
         <div class="card glass" style="width:90%; max-width:600px; max-height: 80vh; display:flex; flex-direction:column;">
@@ -1102,6 +1210,9 @@
                     document.getElementById('dash_role').textContent = data.role === 'vendedor_independiente' ? 'Independiente' : 'Vendedor de Empresa';
                     document.getElementById('dash_goals').textContent = data.sales_goals || 'No definidas';
                     
+                    document.getElementById('dash_sales_goals_display').textContent = data.sales_goals || 'No se han definido metas todavía. Usa el Asistente de Metas IA para configurar tus objetivos financieros.';
+                    document.getElementById('dash_objectives_display').textContent = data.objectives || 'No se han definido directrices estratégicas. El coach usará esta sección para saber en qué enfocarse y guiar tus actividades semanales.';
+
                     // Populate Settings Data
                     document.getElementById('set_name').value = data.name || '';
                     document.getElementById('set_phone').value = data.phone_number || '';
@@ -1874,6 +1985,193 @@
             }
 
             loader.classList.add('hidden');
+            btn.disabled = false;
+        }
+
+        // --- AI Goals Wizard Logic ---
+        let wizardCurrentStep = 1;
+        let coordinatorSellers = []; // Hold reference to coordinator sellers
+
+        function openSellerGoalsWizard() {
+            wizardCurrentStep = 1;
+            document.getElementById('wizard_product_service').value = '';
+            document.getElementById('wizard_ticket_average').value = '';
+            document.getElementById('wizard_target_income').value = '';
+            document.getElementById('wizard_custom_goal').value = '';
+            document.getElementById('wizard_preview_sales_goals').value = '';
+            document.getElementById('wizard_preview_objectives').value = '';
+            
+            updateWizardUI();
+            document.getElementById('modal-goals-wizard').classList.remove('hidden');
+        }
+
+        function closeSellerGoalsWizard() {
+            document.getElementById('modal-goals-wizard').classList.add('hidden');
+        }
+
+        function updateWizardUI() {
+            // Hide all contents
+            document.querySelectorAll('.wizard-step-content').forEach(c => c.classList.add('hidden'));
+            document.getElementById('wizard-loader').classList.add('hidden');
+            document.getElementById('wizard-footer').classList.remove('hidden');
+
+            // Show current step content
+            const currentContent = document.getElementById(`wizard-step-${wizardCurrentStep}-content`);
+            if (currentContent) {
+                currentContent.classList.remove('hidden');
+            }
+
+            // Update Indicators
+            for (let i = 1; i <= 4; i++) {
+                const ind = document.getElementById(`indicator-step-${i}`);
+                if (!ind) continue;
+                if (i < wizardCurrentStep) {
+                    ind.style.background = '#10b981'; // Green completed
+                    ind.style.color = '#fff';
+                    ind.innerHTML = '✓';
+                } else if (i === wizardCurrentStep) {
+                    ind.style.background = 'var(--primary)'; // Purple active
+                    ind.style.color = '#fff';
+                    ind.innerHTML = i;
+                } else {
+                    ind.style.background = 'rgba(255,255,255,0.1)'; // Gray inactive
+                    ind.style.color = '#fff';
+                    ind.innerHTML = i;
+                }
+                
+                // Update connector line
+                const line = document.getElementById(`line-step-${i}`);
+                if (line) {
+                    line.style.background = i < wizardCurrentStep ? '#10b981' : 'rgba(255,255,255,0.1)';
+                }
+            }
+
+            // Update footer controls
+            const btnPrev = document.getElementById('btn-wizard-prev');
+            const btnNext = document.getElementById('btn-wizard-next');
+            const btnApply = document.getElementById('btn-wizard-apply');
+
+            btnPrev.disabled = (wizardCurrentStep === 1 || wizardCurrentStep === 5);
+            
+            if (wizardCurrentStep === 4) {
+                btnNext.innerHTML = 'Calcular con IA ✨';
+                btnNext.classList.remove('hidden');
+                btnApply.classList.add('hidden');
+            } else if (wizardCurrentStep === 5) {
+                btnNext.classList.add('hidden');
+                btnApply.classList.remove('hidden');
+            } else {
+                btnNext.innerHTML = 'Siguiente';
+                btnNext.classList.remove('hidden');
+                btnApply.classList.add('hidden');
+            }
+        }
+
+        function wizardPrevStep() {
+            if (wizardCurrentStep > 1 && wizardCurrentStep < 5) {
+                wizardCurrentStep--;
+                updateWizardUI();
+            }
+        }
+
+        async function wizardNextStep() {
+            // Validate inputs
+            if (wizardCurrentStep === 1) {
+                const prod = document.getElementById('wizard_product_service').value.trim();
+                if (!prod) return alert("Por favor ingresa qué producto o servicio vendes.");
+            } else if (wizardCurrentStep === 2) {
+                const ticket = parseFloat(document.getElementById('wizard_ticket_average').value);
+                if (isNaN(ticket) || ticket <= 0) return alert("Por favor ingresa un precio de venta válido.");
+            } else if (wizardCurrentStep === 3) {
+                const income = parseFloat(document.getElementById('wizard_target_income').value);
+                if (isNaN(income) || income <= 0) return alert("Por favor ingresa un ingreso deseado válido.");
+            }
+
+            if (wizardCurrentStep === 4) {
+                // Call AI endpoint to calculate
+                await calculateAIGoals();
+            } else if (wizardCurrentStep < 4) {
+                wizardCurrentStep++;
+                updateWizardUI();
+            }
+        }
+
+        async function calculateAIGoals() {
+            const product = document.getElementById('wizard_product_service').value.trim();
+            const ticket = parseFloat(document.getElementById('wizard_ticket_average').value);
+            const income = parseFloat(document.getElementById('wizard_target_income').value);
+            const custom = document.getElementById('wizard_custom_goal').value.trim();
+
+            // Hide step contents and show loader
+            document.querySelectorAll('.wizard-step-content').forEach(c => c.classList.add('hidden'));
+            document.getElementById('wizard-loader').classList.remove('hidden');
+            document.getElementById('wizard-footer').classList.add('hidden');
+
+            try {
+                const res = await fetch('/seller/goals/calculate-ai', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        product_service: product,
+                        ticket_average: ticket,
+                        target_income: income,
+                        custom_goal: custom || null
+                    })
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    document.getElementById('wizard_preview_sales_goals').value = data.sales_goals || '';
+                    document.getElementById('wizard_preview_objectives').value = data.objectives || '';
+                    
+                    wizardCurrentStep = 5;
+                } else {
+                    alert("Ocurrió un error al calcular tus metas con IA. Se usarán valores estimados.");
+                    document.getElementById('wizard_preview_sales_goals').value = `Meta: Vender $${(income * 2).toLocaleString()} MXN mensuales.`;
+                    document.getElementById('wizard_preview_objectives').value = `Actividades sugeridas:\n1. Prospectar nuevos clientes para ${product}.\n2. Ofrecer producto con ticket promedio de $${ticket.toLocaleString()} MXN.`;
+                    wizardCurrentStep = 5;
+                }
+            } catch(e) {
+                console.error(e);
+                alert("Error de conexión al llamar a la IA.");
+                wizardCurrentStep = 4; // Stay at step 4
+            }
+
+            updateWizardUI();
+        }
+
+        async function applyWizardGoals() {
+            if (!window.sellerData || !window.sellerData.id) return;
+            const salesGoals = document.getElementById('wizard_preview_sales_goals').value;
+            const objectives = document.getElementById('wizard_preview_objectives').value;
+
+            const btn = document.getElementById('btn-wizard-apply');
+            btn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Aplicando...';
+            btn.disabled = true;
+
+            try {
+                const res = await fetch(`/seller/${window.sellerData.id}/goals`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        sales_goals: salesGoals,
+                        objectives: objectives
+                    })
+                });
+
+                if (res.ok) {
+                    alert("Metas guardadas y aplicadas exitosamente.");
+                    await loadDashboard(window.currentUser.email);
+                    closeSellerGoalsWizard();
+                } else {
+                    alert("Error al guardar metas.");
+                }
+            } catch(e) {
+                console.error(e);
+                alert("Error de conexión al guardar metas.");
+            }
+
+            btn.innerHTML = '<i class="ph ph-check-square"></i> Guardar y Aplicar';
             btn.disabled = false;
         }
     </script>

@@ -132,6 +132,13 @@ class SellerUpdate(BaseModel):
     name: Optional[str] = None
     phone_number: Optional[str] = None
     sales_goals: Optional[str] = None
+    objectives: Optional[str] = None
+
+class AIGoalsCalculationRequest(BaseModel):
+    product_service: str
+    ticket_average: float
+    target_income: float
+    custom_goal: Optional[str] = None
 
 class GoogleTokenUpdate(BaseModel):
     google_refresh_token: str
@@ -319,9 +326,56 @@ def update_seller_goals(user_id: int, payload: SellerUpdate, db: Session = Depen
     
     if payload.sales_goals is not None:
         seller.sales_goals = payload.sales_goals
+    if payload.objectives is not None:
+        seller.objectives = payload.objectives
     
     db.commit()
-    return {"status": "ok", "sales_goals": seller.sales_goals}
+    return {"status": "ok", "sales_goals": seller.sales_goals, "objectives": seller.objectives}
+
+@app.post("/seller/goals/calculate-ai")
+def calculate_seller_goals_ai(payload: AIGoalsCalculationRequest):
+    import json
+    try:
+        from agent.gemini_agent import GenerativeModel
+        model = GenerativeModel(model_name="gemini-2.5-pro")
+        
+        prompt = f"""
+        Eres un Sales Coach experto en planificación financiera y estratégica para vendedores independientes.
+        Ayuda al vendedor a calcular y establecer sus metas numéricas y directrices semanales basándose en:
+        - Producto/Servicio que vende: {payload.product_service}
+        - Precio promedio de venta (Ticket Promedio): ${payload.ticket_average:,.2f} MXN
+        - Ingreso mensual neto deseado: ${payload.target_income:,.2f} MXN
+        {f'- Meta manual / notas adicionales: {payload.custom_goal}' if payload.custom_goal else ''}
+        
+        Realiza lo siguiente:
+        1. Calcula cuántas ventas concretadas al mes necesita realizar para lograr su ingreso mensual deseado (asumiendo un margen razonable si es servicio, o dividiendo el ingreso entre el ticket promedio, explícalo de forma muy concisa).
+        2. Estima cuántos prospectos/contactos necesita iniciar al mes asumiendo una tasa de conversión estándar de la industria (ej. 10% a 20%) para lograr esas ventas.
+        3. Genera un plan de acción semanal corto (ej. cuántas citas agendar en su calendario, cuántas llamadas hacer, etc.).
+        4. Redacta dos secciones claras que encajen en este JSON:
+           - "sales_goals": Las metas numéricas concretas (ej. "Vender $150,000 mensuales, concretando 10 ventas de $15,000").
+           - "objectives": El enfoque estratégico y actividades semanales del Coach de IA (ej. "Llamar a 5 prospectos al día, agendar 3 demostraciones por semana, y hacer seguimiento a cotizaciones los viernes").
+        
+        Responde ÚNICAMENTE con un objeto JSON válido con las llaves "sales_goals" y "objectives". No uses Markdown, no uses bloques de código (```json), responde texto plano JSON.
+        """
+        
+        response = model.generate_content(prompt)
+        text_response = response.text.strip()
+        # Clean markdown code blocks if any
+        if text_response.startswith("```json"):
+            text_response = text_response[7:]
+        if text_response.endswith("```"):
+            text_response = text_response[:-3]
+        text_response = text_response.strip()
+        
+        data = json.loads(text_response)
+        return data
+    except Exception as e:
+        logger.error(f"Error calculating goals: {e}")
+        # Return fallback values
+        return {
+            "sales_goals": f"Meta sugerida: Vender ${(payload.target_income * 2):,.2f} MXN al mes.",
+            "objectives": f"Enfoque sugerido:\n1. Vender {payload.product_service}.\n2. Realizar llamadas de prospección semanal.\n3. Agendar citas en Google Calendar."
+        }
 
 @app.put("/auth/seller/{user_id}/google")
 def update_google_token(user_id: int, payload: GoogleTokenUpdate, db: Session = Depends(get_db)):
