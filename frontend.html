@@ -515,7 +515,8 @@
             
             <div class="tabs-simple" style="display:flex; gap:10px; margin-bottom:20px;">
                 <button class="btn btn-outline" style="flex:1;" id="btn-tab-indep" onclick="toggleRegTab('indep')">Independiente</button>
-                <button class="btn btn-outline" style="flex:1; opacity: 0.5;" id="btn-tab-empresa" onclick="toggleRegTab('empresa')">Empresa (Código)</button>
+                <button class="btn btn-outline" style="flex:1; opacity: 0.5;" id="btn-tab-empresa" onclick="toggleRegTab('empresa')">Empresa (Unirse)</button>
+                <button class="btn btn-outline" style="flex:1; opacity: 0.5;" id="btn-tab-crearempresa" onclick="toggleRegTab('crearempresa')">Crear Empresa</button>
             </div>
 
             <div id="reg_indep">
@@ -528,6 +529,13 @@
             <div id="reg_empresa" class="hidden">
                 <div class="form-group"><label>Código de la Empresa</label><input type="text" id="claim_code" placeholder="Pídeselo a tu administrador"></div>
                 <button class="btn" style="width:100%; margin-top:10px;" onclick="claimAccount()"><i class="ph ph-link"></i> Vincular Cuenta</button>
+            </div>
+
+            <div id="reg_crearempresa" class="hidden">
+                <div class="form-group"><label>Nombre de tu Empresa</label><input type="text" id="create_comp_name" placeholder="Ej. Mi Agencia SA de CV"></div>
+                <div class="form-group"><label>Tu Nombre (Administrador)</label><input type="text" id="create_admin_name" placeholder="Ej. Miguel Gonzalez"></div>
+                <div class="form-group"><label>Tu Teléfono (WhatsApp) <span style="color:var(--danger)">*</span></label><input type="text" id="create_admin_phone" placeholder="Ej. 526672013019"></div>
+                <button class="btn" style="width:100%; margin-top:10px;" onclick="registerCompanyAdmin()"><i class="ph ph-buildings"></i> Crear Empresa</button>
             </div>
             
             <div id="onboardingAlert" class="alert" style="margin-top: 20px;"></div>
@@ -916,8 +924,10 @@
         function toggleRegTab(tab) {
             document.getElementById('reg_indep').classList.add('hidden');
             document.getElementById('reg_empresa').classList.add('hidden');
+            document.getElementById('reg_crearempresa').classList.add('hidden');
             document.getElementById('btn-tab-indep').style.opacity = '0.5';
             document.getElementById('btn-tab-empresa').style.opacity = '0.5';
+            document.getElementById('btn-tab-crearempresa').style.opacity = '0.5';
 
             document.getElementById(`reg_${tab}`).classList.remove('hidden');
             document.getElementById(`btn-tab-${tab}`).style.opacity = '1';
@@ -928,6 +938,46 @@
             el.className = isSuccess ? 'alert success' : 'alert error';
             el.innerHTML = isSuccess ? `<i class="ph-fill ph-check-circle"></i> ${message}` : `<i class="ph-fill ph-warning-circle"></i> ${message}`;
             el.style.display = 'flex';
+        }
+
+        async function registerCompanyAdmin() {
+            const compName = document.getElementById('create_comp_name').value;
+            const adminName = document.getElementById('create_admin_name').value;
+            const phone = document.getElementById('create_admin_phone').value;
+            if(!compName || !phone) return showAlert('onboardingAlert', 'Nombre de empresa y teléfono son obligatorios', false);
+
+            const payload = {
+                company_name: compName,
+                admin_name: adminName,
+                phone_number: phone,
+                email: window.currentUser.email,
+                firebase_uid: window.currentUser.uid
+            };
+
+            const btn = document.querySelector('#reg_crearempresa .btn');
+            btn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Creando Empresa...';
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/auth/seller/company-admin', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if(res.ok) {
+                    showAlert('onboardingAlert', `Empresa creada. Código de empresa: ${data.company_code}`, true);
+                    setTimeout(() => { loadDashboard(window.currentUser.email); }, 2000);
+                } else {
+                    showAlert('onboardingAlert', data.detail || 'Error en registro', false);
+                    btn.innerHTML = '<i class="ph ph-buildings"></i> Crear Empresa';
+                    btn.disabled = false;
+                }
+            } catch(e) {
+                showAlert('onboardingAlert', 'Error de conexión', false);
+                btn.innerHTML = '<i class="ph ph-buildings"></i> Crear Empresa';
+                btn.disabled = false;
+            }
         }
 
         async function loadDashboard(email) {

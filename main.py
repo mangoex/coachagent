@@ -278,6 +278,35 @@ def claim_account(payload: SellerClaim, db: Session = Depends(get_db)):
     db.commit()
     return {"detail": "Cuenta vinculada exitosamente", "phone_number": user.phone_number}
 
+class CompanyAdminCreate(BaseModel):
+    company_name: str
+    admin_name: str
+    phone_number: str
+    email: str
+    firebase_uid: str
+
+@app.post("/auth/seller/company-admin")
+def register_company_admin(payload: CompanyAdminCreate, db: Session = Depends(get_db)):
+    # Create Company
+    code = f"{payload.company_name[:3].upper()}-{str(uuid.uuid4())[:6].upper()}"
+    new_company = Company(name=payload.company_name, company_code=code)
+    db.add(new_company)
+    db.commit()
+    db.refresh(new_company)
+    
+    # Create Admin User
+    new_user = User(
+        name=payload.admin_name,
+        phone_number=payload.phone_number,
+        email=payload.email,
+        role="admin_empresa",
+        company_id=new_company.id,
+        firebase_uid=payload.firebase_uid
+    )
+    db.add(new_user)
+    db.commit()
+    return {"detail": "Empresa y administrador creados exitosamente", "company_code": new_company.company_code}
+
 @app.post("/auth/seller/independent")
 def register_independent(payload: SellerIndependent, db: Session = Depends(get_db)):
     existing_user_by_phone = db.query(User).filter(User.phone_number == payload.phone_number).first()
