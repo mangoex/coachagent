@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel, EmailStr
 from typing import Optional
 import uuid
@@ -366,7 +367,11 @@ def preregister_seller(company_code: str, payload: SellerPreRegister, db: Sessio
         objectives=payload.objectives
     )
     db.add(new_user)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="El correo o teléfono ya está en uso por otro vendedor.")
     return {"detail": "Vendedor pre-registrado correctamente"}
 
 @app.post("/auth/seller/claim")
