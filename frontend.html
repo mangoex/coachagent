@@ -892,7 +892,7 @@
                     </div>
                     <div style="display:flex; gap:10px;">
                         <button class="btn btn-outline" onclick="loadTeamData()"><i class="ph ph-arrows-clockwise"></i> Refrescar</button>
-                        <button class="btn" onclick="document.getElementById('modal-add-seller').classList.remove('hidden')"><i class="ph ph-plus"></i> Invitar Vendedor</button>
+                        <button class="btn" id="btn-invite-seller" onclick="document.getElementById('modal-add-seller').classList.remove('hidden')"><i class="ph ph-plus"></i> Invitar Vendedor</button>
                     </div>
                 </div>
 
@@ -948,26 +948,31 @@
 
     <!-- Edit Goals Modal -->
     <div id="modal-edit-goals" class="hidden" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:9999; display:flex; align-items:center; justify-content:center;">
-        <div class="card glass" style="width:90%; max-width:500px;">
-            <div class="card-header">
-                <div class="card-title">Editar Metas de Venta</div>
-                <button class="btn-outline" style="border:none; color:white;" onclick="document.getElementById('modal-edit-goals').classList.add('hidden')"><i class="ph ph-x"></i></button>
+        <div class="card glass" style="width:90%; max-width:600px; padding: 30px;">
+            <div class="card-header" style="margin-bottom: 20px;">
+                <div class="card-title" style="font-size: 20px;"><i class="ph ph-target"></i> Editar Metas de Venta</div>
+                <button class="btn-outline" style="border:none; color:white; font-size: 20px;" onclick="document.getElementById('modal-edit-goals').classList.add('hidden')"><i class="ph ph-x"></i></button>
             </div>
-            <div class="form-group">
-                <label>Vendedor</label>
-                <input type="text" id="edit_goal_seller_name" readonly style="opacity:0.7">
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label style="color: var(--text-muted); font-size: 13px; text-transform: uppercase; letter-spacing: 1px;">Vendedor</label>
+                <input type="text" id="edit_goal_seller_name" readonly style="opacity:0.8; font-weight: bold; background: rgba(0,0,0,0.2); border: none;">
             </div>
-            <div class="form-group">
-                <label style="display:flex; justify-content:space-between; align-items:center;">
-                    <span>Nuevas Metas</span>
-                    <button class="btn-outline" style="font-size: 12px; padding: 4px 8px;" onclick="suggestAIGoals()" id="btn-suggest-ai">✨ Sugerir IA</button>
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px;">
+                    <span style="color: var(--text-muted); font-size: 13px; text-transform: uppercase; letter-spacing: 1px;">Nuevas Metas y Directrices</span>
+                    <button class="btn" style="font-size: 13px; padding: 6px 12px; background: linear-gradient(135deg, #6366f1, #a855f7); border: none;" onclick="suggestAIGoals()" id="btn-suggest-ai"><i class="ph-fill ph-magic-wand"></i> Sugerir con IA</button>
                 </label>
-                <textarea class="input" id="edit_goal_text" rows="5" style="resize:vertical;" placeholder="Establece las metas que el sistema usará para crear sus planes semanales..."></textarea>
-                <div id="ai-suggestion-loader" class="hidden" style="font-size: 12px; color: var(--primary); margin-top: 5px;"><i class="ph ph-spinner ph-spin"></i> La IA está analizando el rendimiento y las metas globales...</div>
+                <textarea class="input" id="edit_goal_text" rows="6" style="resize:vertical; font-size: 14px; line-height: 1.5; padding: 15px; border-radius: 12px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1);" placeholder="Describe las metas mensuales o semanales que este vendedor debe cumplir. El agente de IA utilizará esta información para guiar y presionar al vendedor en sus interacciones..."></textarea>
+                <div id="ai-suggestion-loader" class="hidden" style="font-size: 13px; color: var(--primary); margin-top: 10px; display: flex; align-items: center; gap: 8px;">
+                    <i class="ph ph-spinner ph-spin" style="font-size: 16px;"></i> Analizando rendimiento histórico y metas globales...
+                </div>
             </div>
             <input type="hidden" id="edit_goal_seller_id">
             <input type="hidden" id="edit_goal_metrics">
-            <button class="btn" style="width:100%; margin-top:10px;" onclick="saveSellerGoals()">Guardar Metas</button>
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
+                <button class="btn btn-outline" onclick="document.getElementById('modal-edit-goals').classList.add('hidden')">Cancelar</button>
+                <button class="btn" onclick="saveSellerGoals()"><i class="ph ph-floppy-disk"></i> Guardar Metas</button>
+            </div>
         </div>
     </div>
 
@@ -1162,18 +1167,17 @@
                     }
 
                     // Check Company Tab visibility
-                    if (data.role === 'vendedor_empresa' || data.role === 'admin' || data.company_code) {
-                        document.getElementById('nav-company').style.display = 'flex';
+                    if (data.company_code) {
+                        document.getElementById('nav-team').style.display = 'flex';
                         if (data.role === 'admin' || data.role === 'admin_empresa') {
-                            document.getElementById('nav-team').style.display = 'flex';
+                            document.getElementById('nav-company').style.display = 'flex';
                             document.getElementById('nav-coordinator').style.display = 'flex';
+                            document.getElementById('btn-invite-seller').style.display = 'inline-flex';
+                            loadCoordinatorDashboard(data.company_code);
+                        } else {
+                            document.getElementById('btn-invite-seller').style.display = 'none';
                         }
-                        if (data.company_code) {
-                            loadCompanyData(data.company_code);
-                            if (data.role === 'admin' || data.role === 'admin_empresa') {
-                                loadCoordinatorDashboard(data.company_code);
-                            }
-                        }
+                        loadCompanyData(data.company_code);
                     }
 
                     // Load Upcoming Events
@@ -1591,9 +1595,25 @@
                         const tr = document.createElement('tr');
                         tr.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
                         const roleBadge = s.role === 'admin' || s.role === 'admin_empresa' ? '<span style="font-size:10px; background:var(--primary); padding:2px 6px; border-radius:4px; margin-left:8px;">Admin</span>' : '';
+                        
+                        let actionButtons = '';
+                        if (window.sellerData && (window.sellerData.role === 'admin' || window.sellerData.role === 'admin_empresa')) {
+                            actionButtons = `
+                                <button class="btn btn-outline" style="padding: 6px 12px; font-size:12px;" onclick="openEditGoalsModal(${s.id}, '${s.name.replace(/'/g, "\\'")}', '${(s.sales_goals || '').replace(/'/g, "\\'").replace(/\n/g, '\\n')}')">
+                                    <i class="ph ph-pencil-simple"></i> Editar Metas
+                                </button>
+                                <button class="btn btn-outline" style="padding: 6px 12px; font-size:12px;" onclick="openAgendaModal(${s.id}, '${s.name.replace(/'/g, "\\'")}')">
+                                    <i class="ph ph-calendar"></i> Ver Agenda
+                                </button>
+                            `;
+                        } else {
+                            // Non-admins can only see the info, no actions
+                            actionButtons = `<span style="color:var(--text-muted); font-size:12px; font-style:italic;">Sin acciones</span>`;
+                        }
+
                         tr.innerHTML = `
                             <td style="padding: 15px 10px;">
-                                <div style="font-weight:600;">${s.name}</div>
+                                <div style="font-weight:600;">${s.name} ${roleBadge}</div>
                                 <div style="font-size:12px; color:var(--text-muted);">${s.email}</div>
                             </td>
                             <td style="padding: 15px 10px; color:var(--accent); font-family:monospace;">${s.phone_number}</td>
@@ -1602,12 +1622,7 @@
                             </td>
                             <td style="padding: 15px 10px;">
                                 <div style="display:flex; gap:8px;">
-                                    <button class="btn btn-outline" style="padding: 6px 12px; font-size:12px;" onclick="openEditGoalsModal(${s.id}, '${s.name.replace(/'/g, "\\'")}', '${(s.sales_goals || '').replace(/'/g, "\\'").replace(/\n/g, '\\n')}')">
-                                        <i class="ph ph-pencil-simple"></i> Editar Metas
-                                    </button>
-                                    <button class="btn btn-outline" style="padding: 6px 12px; font-size:12px;" onclick="openAgendaModal(${s.id}, '${s.name.replace(/'/g, "\\'")}')">
-                                        <i class="ph ph-calendar"></i> Ver Agenda
-                                    </button>
+                                    ${actionButtons}
                                 </div>
                             </td>
                         `;
