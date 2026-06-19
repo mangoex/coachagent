@@ -534,7 +534,7 @@ def update_daily_activity_log(user_id: int, payload: DailyActivityLogUpdate, db:
     ).first()
     
     if not log:
-        log = DailyActivityLog(user_id=user_id, date=log_date)
+        log = DailyActivityLog(user_id=user_id, date=log_date, citas_completadas=0, llamadas_completadas=0, propuestas_completadas=0)
         db.add(log)
         
     log.citas_completadas = payload.citas
@@ -674,7 +674,7 @@ def complete_calendar_event(user_id: int, event_id: str, payload: EventCompletio
         ).first()
         
         if not log:
-            log = DailyActivityLog(user_id=user_id, date=log_date)
+            log = DailyActivityLog(user_id=user_id, date=log_date, citas_completadas=0, llamadas_completadas=0, propuestas_completadas=0)
             db.add(log)
             
         log.citas_completadas += 1

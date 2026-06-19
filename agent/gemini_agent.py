@@ -351,7 +351,7 @@ class GeminiAgent:
                 ).first()
 
                 if not log:
-                    log = DailyActivityLog(user_id=user.id, date=log_date)
+                    log = DailyActivityLog(user_id=user.id, date=log_date, citas_completadas=0, llamadas_completadas=0, propuestas_completadas=0)
                     db.add(log)
                     db.flush()
 
