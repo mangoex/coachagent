@@ -828,7 +828,7 @@
                         <p>Tablero gráfico y metas globales de la empresa</p>
                     </div>
                     <div style="display:flex; gap:10px;">
-                        <button class="btn btn-outline" onclick="loadCoordinatorDashboard(currentUser.company_code)"><i class="ph ph-arrows-clockwise"></i> Refrescar</button>
+                        <button class="btn btn-outline" onclick="loadCoordinatorDashboard(window.currentUser ? window.currentUser.company_code : '')"><i class="ph ph-arrows-clockwise"></i> Refrescar</button>
                     </div>
                 </div>
 
@@ -1092,6 +1092,9 @@
                 if (res.ok) {
                     const data = await res.json();
                     window.sellerData = data; // Save to memory for Playground
+                    if (window.currentUser) {
+                        window.currentUser.company_code = data.company_code;
+                    }
                     
                     // Populate Dashboard Data
                     document.getElementById('dash_name').textContent = data.name || '-';
@@ -1807,13 +1810,13 @@
         }
 
         async function saveGlobalGoals() {
-            if (!currentUser || !currentUser.company_code) return;
+            if (!window.currentUser || !window.currentUser.company_code) return;
             const btn = document.querySelector('#coordinator_global_goals').nextElementSibling;
             btn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Guardando...';
             const goals = document.getElementById('coordinator_global_goals').value;
             
             try {
-                const res = await fetch(`/companies/${currentUser.company_code}/global-goals`, {
+                const res = await fetch(`/companies/${window.currentUser.company_code}/global-goals`, {
                     method: 'PUT',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ global_goals: goals })
@@ -1844,13 +1847,13 @@
             const metricsJson = document.getElementById('edit_goal_metrics').value;
             const sellerId = document.getElementById('edit_goal_seller_id').value;
 
-            if (!currentUser || !currentUser.company_code) return;
+            if (!window.currentUser || !window.currentUser.company_code) return;
 
             btn.disabled = true;
             loader.classList.remove('hidden');
 
             try {
-                const res = await fetch(`/companies/${currentUser.company_code}/sellers/${sellerId}/ai-goals`, {
+                const res = await fetch(`/companies/${window.currentUser.company_code}/sellers/${sellerId}/ai-goals`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ metrics: JSON.parse(metricsJson) })
