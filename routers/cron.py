@@ -5,7 +5,7 @@ from datetime import datetime
 import json
 
 from database.connection import get_db
-from database.models import User, ConversationLog, Company
+from database.models import User, ConversationLog, Company, CalendarEventAudit, DailyActivityLog
 from services.calendar_service import GoogleCalendarService
 from services.sheets_service import GoogleSheetsService
 from services.whatsapp_service import WhatsAppService
@@ -80,7 +80,8 @@ def morning_briefing(db: Session = Depends(get_db)):
         agent = GeminiAgent(
             user_refresh_token=refresh_token,
             spreadsheet_id=user.spreadsheet_id,
-            template_doc_id=user.template_doc_id
+            template_doc_id=user.template_doc_id,
+            phone_number=user.phone_number
         )
 
         # Generate briefing text
@@ -145,14 +146,27 @@ def evening_accountability(db: Session = Depends(get_db)):
         
         try:
             refresh_token = user.get_refresh_token()
+            if not refresh_token:
+                continue
         except Exception as e:
             logger.error(f"Failed to decrypt token for accountability check of {user.email}: {str(e)}")
             continue
 
-        # Fetch today's agenda to find meetings
-        today_str = datetime.utcnow().strftime("%Y-%m-%d")
+        # Fetch timezone and today's date in user local time
+        import pytz
+        cal_tz = "America/Mexico_City"
         try:
-            events = GoogleCalendarService.list_events(refresh_token, today_str)
+            metadata = GoogleCalendarService.get_calendar_metadata(refresh_token, user.calendar_id)
+            cal_tz = metadata.get("timeZone", "America/Mexico_City")
+        except Exception:
+            pass
+        tz = pytz.timezone(cal_tz)
+        now_local = datetime.now(tz)
+        today_str = now_local.strftime("%Y-%m-%d")
+
+        # Fetch today's agenda to find meetings
+        try:
+            events = GoogleCalendarService.list_events(refresh_token, today_str, user.calendar_id)
         except Exception as e:
             logger.error(f"Error fetching calendar for accountability of {user.email}: {str(e)}")
             events = []
@@ -160,57 +174,114 @@ def evening_accountability(db: Session = Depends(get_db)):
         if not events:
             # Salesperson had no meetings today, send a generic closing message
             msg = f"¡Hola {user.name}! He revisado tu agenda y no tenías reuniones hoy. ¡Espero que hayas tenido un día productivo!"
-            WhatsAppService.send_text_message(user.phone_number, msg)
+            # Get company credentials if the user belongs to one, else global
+            company_token = user.company.get_whatsapp_token() if user.company else None
+            phone_id = user.company.whatsapp_phone_number_id if user.company else None
+            WhatsAppService.send_text_message(user.phone_number, msg, token=company_token, phone_id=phone_id)
             results.append({"email": user.email, "status": "no_meetings_today"})
             continue
 
-        # Get company credentials if the user belongs to one
-        company_token = None
-        phone_id = None
-        if user.company_id:
-            company = db.query(Company).filter(Company.id == user.company_id).first()
-            if company:
-                company_token = company.get_whatsapp_token()
-                phone_id = company.whatsapp_phone_number_id
+        # Find un-audited events today
+        event_ids = [e["id"] for e in events if e.get("id")]
+        audits = db.query(CalendarEventAudit).filter(
+            CalendarEventAudit.user_id == user.id,
+            CalendarEventAudit.event_id.in_(event_ids)
+        ).all() if event_ids else []
+        audited_map = {a.event_id: a for a in audits}
+        
+        un_audited_events = []
+        for e in events:
+            eid = e.get("id")
+            audit = audited_map.get(eid)
+            # If not audited or not completed/resolved
+            if not audit or audit.audit_status == "pending":
+                un_audited_events.append(e)
 
-        # Find the most important or first meeting to audit
-        audit_meeting = events[-1]
-        meeting_id = audit_meeting["id"]
+        if not un_audited_events:
+            results.append({"email": user.email, "status": "all_meetings_audited"})
+            continue
+
+        # Get company credentials if the user belongs to one
+        company_token = user.company.get_whatsapp_token() if user.company else None
+        phone_id = user.company.whatsapp_phone_number_id if user.company else None
+
+        # Find the first un-audited meeting to audit
+        audit_meeting = un_audited_events[0]
+        eid = audit_meeting["id"]
         meeting_summary = audit_meeting["summary"]
         
+        # Save or update state in DB
+        audit_entry = db.query(CalendarEventAudit).filter(
+            CalendarEventAudit.user_id == user.id,
+            CalendarEventAudit.event_id == eid
+        ).first()
+        
+        if not audit_entry:
+            start_dt = None
+            start_str = audit_meeting.get("start")
+            if start_str:
+                try:
+                    start_dt = datetime.fromisoformat(start_str.replace("Z", "+00:00"))
+                except Exception:
+                    pass
+            audit_entry = CalendarEventAudit(
+                user_id=user.id,
+                event_id=eid,
+                event_summary=meeting_summary,
+                event_start=start_dt,
+                is_completed=False,
+                audit_status="sent_whatsapp"
+            )
+            db.add(audit_entry)
+        else:
+            audit_entry.audit_status = "sent_whatsapp"
+        db.commit()
+
         # Save state machine in Redis
-        # Expires in 4 hours
         redis_memory.set_state(
             phone_number=user.phone_number,
             state="AWAITING_MEETING_FEEDBACK",
             metadata={
-                "meeting_id": meeting_id,
+                "meeting_id": eid,
                 "meeting_summary": meeting_summary
             },
             ttl=14400
         )
 
-        # Construct interactive WhatsApp message with Yes/No buttons
+        # Construct interactive WhatsApp message
         body_text = f"Hola {user.name}, ¿cómo te fue en tu junta de hoy: '{meeting_summary}'? ¿Se realizó la reunión?"
         
-        # Proactive evening check using template
-        components = [
-            {
-                "type": "body",
-                "parameters": [
-                    {"type": "text", "text": body_text}
-                ]
-            }
+        buttons = [
+            {"id": f"btn_yes_{eid}", "title": "Sí, se realizó"},
+            {"id": f"btn_no_{eid}", "title": "No se realizó"}
         ]
-
-        # Replace 'evening_accountability' with the actual template name registered in Meta
-        success = WhatsAppService.send_template_message(
+        
+        # Try sending custom interactive buttons first
+        success = WhatsAppService.send_interactive_buttons(
             to_phone=user.phone_number,
-            template_name="evening_accountability",
-            components=components,
+            body_text=body_text,
+            buttons=buttons,
             token=company_token,
             phone_id=phone_id
         )
+        
+        if not success:
+            # Fallback to template message
+            components = [
+                {
+                    "type": "body",
+                    "parameters": [
+                        {"type": "text", "text": body_text}
+                    ]
+                }
+            ]
+            success = WhatsAppService.send_template_message(
+                to_phone=user.phone_number,
+                template_name="evening_accountability",
+                components=components,
+                token=company_token,
+                phone_id=phone_id
+            )
 
         # Log agent message to DB
         db_log = ConversationLog(phone_number=user.phone_number, sender="agent", message=body_text)
@@ -307,7 +378,8 @@ def daily_plan(db: Session = Depends(get_db)):
         agent = GeminiAgent(
             user_refresh_token=refresh_token,
             spreadsheet_id=user.spreadsheet_id,
-            template_doc_id=user.template_doc_id
+            template_doc_id=user.template_doc_id,
+            phone_number=user.phone_number
         )
 
         plan_text, _ = agent.run([], prompt)

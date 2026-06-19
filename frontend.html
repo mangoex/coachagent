@@ -568,6 +568,9 @@
                 <a class="nav-item" onclick="showAppView('playground')" id="nav-playground">
                     <i class="ph ph-chat-teardrop-text"></i> Playground
                 </a>
+                <a class="nav-item" onclick="showAppView('accountability')" id="nav-accountability" style="display:none;">
+                    <i class="ph ph-check-square"></i> Actividades y Metas
+                </a>
                 <a class="nav-item" onclick="showAppView('settings')" id="nav-settings">
                     <i class="ph ph-gear"></i> Configuración
                 </a>
@@ -932,7 +935,232 @@
                             </tbody>
                         </table>
                     </div>
+            </div>
+
+            <!-- VIEW: ACCOUNTABILITY -->
+            <div id="view-accountability" class="view-panel">
+                <div class="page-header">
+                    <div>
+                        <h2>Actividades y Metas</h2>
+                        <p>Tablero de Accountability: registra actividades y mide tu avance contra tus metas de venta</p>
+                    </div>
+                    <div>
+                        <button class="btn btn-outline" onclick="loadAccountabilityData()"><i class="ph ph-arrows-clockwise"></i> Recargar Tablero</button>
+                    </div>
                 </div>
+
+                <!-- Progress Grid -->
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap:20px; margin-bottom:30px;">
+                    
+                    <!-- Citas Card -->
+                    <div class="card glass">
+                        <div class="card-header">
+                            <div class="card-title" style="color:var(--primary);"><i class="ph ph-calendar"></i> Citas / Reuniones</div>
+                        </div>
+                        <div style="padding:15px;">
+                            <div style="margin-bottom:15px;">
+                                <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:13px;">
+                                    <span>Hoy</span>
+                                    <span id="act_citas_today">- de -</span>
+                                </div>
+                                <div class="progress-bar-container" style="background:rgba(255,255,255,0.05); height:8px; border-radius:4px; overflow:hidden;">
+                                    <div id="bar_citas_today" style="background:var(--primary); width:0%; height:100%; transition:width 0.4s;"></div>
+                                </div>
+                            </div>
+                            <div style="margin-bottom:15px;">
+                                <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:13px;">
+                                    <span>Esta Semana</span>
+                                    <span id="act_citas_weekly">- de -</span>
+                                </div>
+                                <div class="progress-bar-container" style="background:rgba(255,255,255,0.05); height:8px; border-radius:4px; overflow:hidden;">
+                                    <div id="bar_citas_weekly" style="background:var(--primary); width:0%; height:100%; transition:width 0.4s;"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:13px;">
+                                    <span>Este Mes</span>
+                                    <span id="act_citas_monthly">- de -</span>
+                                </div>
+                                <div class="progress-bar-container" style="background:rgba(255,255,255,0.05); height:8px; border-radius:4px; overflow:hidden;">
+                                    <div id="bar_citas_monthly" style="background:var(--primary); width:0%; height:100%; transition:width 0.4s;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Llamadas Card -->
+                    <div class="card glass">
+                        <div class="card-header">
+                            <div class="card-title" style="color:var(--accent);"><i class="ph ph-phone"></i> Llamadas</div>
+                        </div>
+                        <div style="padding:15px;">
+                            <div style="margin-bottom:15px;">
+                                <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:13px;">
+                                    <span>Hoy</span>
+                                    <span id="act_llamadas_today">- de -</span>
+                                </div>
+                                <div class="progress-bar-container" style="background:rgba(255,255,255,0.05); height:8px; border-radius:4px; overflow:hidden;">
+                                    <div id="bar_llamadas_today" style="background:var(--accent); width:0%; height:100%; transition:width 0.4s;"></div>
+                                </div>
+                            </div>
+                            <div style="margin-bottom:15px;">
+                                <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:13px;">
+                                    <span>Esta Semana</span>
+                                    <span id="act_llamadas_weekly">- de -</span>
+                                </div>
+                                <div class="progress-bar-container" style="background:rgba(255,255,255,0.05); height:8px; border-radius:4px; overflow:hidden;">
+                                    <div id="bar_llamadas_weekly" style="background:var(--accent); width:0%; height:100%; transition:width 0.4s;"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:13px;">
+                                    <span>Este Mes</span>
+                                    <span id="act_llamadas_monthly">- de -</span>
+                                </div>
+                                <div class="progress-bar-container" style="background:rgba(255,255,255,0.05); height:8px; border-radius:4px; overflow:hidden;">
+                                    <div id="bar_llamadas_monthly" style="background:var(--accent); width:0%; height:100%; transition:width 0.4s;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Propuestas Card -->
+                    <div class="card glass">
+                        <div class="card-header">
+                            <div class="card-title" style="color:var(--success);"><i class="ph ph-file-text"></i> Propuestas Entregadas</div>
+                        </div>
+                        <div style="padding:15px;">
+                            <div style="margin-bottom:15px;">
+                                <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:13px;">
+                                    <span>Hoy</span>
+                                    <span id="act_propuestas_today">- de -</span>
+                                </div>
+                                <div class="progress-bar-container" style="background:rgba(255,255,255,0.05); height:8px; border-radius:4px; overflow:hidden;">
+                                    <div id="bar_propuestas_today" style="background:var(--success); width:0%; height:100%; transition:width 0.4s;"></div>
+                                </div>
+                            </div>
+                            <div style="margin-bottom:15px;">
+                                <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:13px;">
+                                    <span>Esta Semana</span>
+                                    <span id="act_propuestas_weekly">- de -</span>
+                                </div>
+                                <div class="progress-bar-container" style="background:rgba(255,255,255,0.05); height:8px; border-radius:4px; overflow:hidden;">
+                                    <div id="bar_propuestas_weekly" style="background:var(--success); width:0%; height:100%; transition:width 0.4s;"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:13px;">
+                                    <span>Este Mes</span>
+                                    <span id="act_propuestas_monthly">- de -</span>
+                                </div>
+                                <div class="progress-bar-container" style="background:rgba(255,255,255,0.05); height:8px; border-radius:4px; overflow:hidden;">
+                                    <div id="bar_propuestas_monthly" style="background:var(--success); width:0%; height:100%; transition:width 0.4s;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:20px; align-items:start;">
+                    
+                    <!-- Left: Google Calendar Citas Audit List -->
+                    <div class="card glass">
+                        <div class="card-header">
+                            <div class="card-title"><i class="ph ph-calendar-check"></i> Reuniones de Hoy en Google Calendar</div>
+                        </div>
+                        <div style="padding:15px;" id="accountability-calendar-events-list">
+                            <div style="text-align:center; color:var(--text-muted); padding:10px;">Cargando calendario...</div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Daily Tracker Form -->
+                    <div class="card glass">
+                        <div class="card-header">
+                            <div class="card-title"><i class="ph ph-note-pencil"></i> Registrar Progreso Diario (Hoy)</div>
+                        </div>
+                        <div style="padding:15px;">
+                            <div class="form-group">
+                                <label>Citas Realizadas</label>
+                                <input type="number" id="log_citas_input" min="0" value="0">
+                            </div>
+                            <div class="form-group">
+                                <label>Llamadas Realizadas</label>
+                                <input type="number" id="log_llamadas_input" min="0" value="0">
+                            </div>
+                            <div class="form-group">
+                                <label>Propuestas Entregadas</label>
+                                <input type="number" id="log_propuestas_input" min="0" value="0">
+                            </div>
+                            <button class="btn" style="width:100%; margin-top:10px;" onclick="saveDailyActivityLog()"><i class="ph ph-floppy-disk"></i> Guardar Actividades de Hoy</button>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Goals Configuration (Plan) Card -->
+                <div class="card glass" style="margin-top:20px; max-width: 800px;">
+                    <div class="card-header">
+                        <div class="card-title"><i class="ph ph-sliders"></i> Configurar Metas y Objetivos (Plan de Accountability)</div>
+                    </div>
+                    <div style="padding:15px; display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:15px;">
+                        
+                        <!-- Citas targets -->
+                        <div style="border-right: 1px solid rgba(255,255,255,0.05); padding-right:15px;">
+                            <h4 style="margin-bottom:10px; color:var(--primary); font-family:'Outfit';">Metas: Citas</h4>
+                            <div class="form-group" style="margin-bottom:10px;">
+                                <label style="font-size:11px;">Meta Diaria</label>
+                                <input type="number" id="plan_citas_diaria" min="0" value="0">
+                            </div>
+                            <div class="form-group" style="margin-bottom:10px;">
+                                <label style="font-size:11px;">Meta Semanal</label>
+                                <input type="number" id="plan_citas_semanal" min="0" value="0">
+                            </div>
+                            <div class="form-group">
+                                <label style="font-size:11px;">Meta Mensual</label>
+                                <input type="number" id="plan_citas_mensual" min="0" value="0">
+                            </div>
+                        </div>
+
+                        <!-- Llamadas targets -->
+                        <div style="border-right: 1px solid rgba(255,255,255,0.05); padding-right:15px;">
+                            <h4 style="margin-bottom:10px; color:var(--accent); font-family:'Outfit';">Metas: Llamadas</h4>
+                            <div class="form-group" style="margin-bottom:10px;">
+                                <label style="font-size:11px;">Meta Diaria</label>
+                                <input type="number" id="plan_llamadas_diaria" min="0" value="0">
+                            </div>
+                            <div class="form-group" style="margin-bottom:10px;">
+                                <label style="font-size:11px;">Meta Semanal</label>
+                                <input type="number" id="plan_llamadas_semanal" min="0" value="0">
+                            </div>
+                            <div class="form-group">
+                                <label style="font-size:11px;">Meta Mensual</label>
+                                <input type="number" id="plan_llamadas_mensual" min="0" value="0">
+                            </div>
+                        </div>
+
+                        <!-- Propuestas targets -->
+                        <div>
+                            <h4 style="margin-bottom:10px; color:var(--success); font-family:'Outfit';">Metas: Propuestas</h4>
+                            <div class="form-group" style="margin-bottom:10px;">
+                                <label style="font-size:11px;">Meta Diaria</label>
+                                <input type="number" id="plan_propuestas_diaria" min="0" value="0">
+                            </div>
+                            <div class="form-group" style="margin-bottom:10px;">
+                                <label style="font-size:11px;">Meta Semanal</label>
+                                <input type="number" id="plan_propuestas_semanal" min="0" value="0">
+                            </div>
+                            <div class="form-group">
+                                <label style="font-size:11px;">Meta Mensual</label>
+                                <input type="number" id="plan_propuestas_mensual" min="0" value="0">
+                            </div>
+                        </div>
+                        
+                    </div>
+                    <div style="padding:0 15px 15px 15px;">
+                        <button class="btn btn-outline" style="width:100%;" onclick="saveAccountabilityPlan()"><i class="ph ph-check-square"></i> Guardar Plan de Metas</button>
+                    </div>
+                </div>
+
             </div>
 
         </main>
@@ -1127,6 +1355,8 @@
                 loadCalendars();
             } else if (view === 'team') {
                 loadTeamData();
+            } else if (view === 'accountability') {
+                loadAccountabilityData();
             }
         }
 
@@ -1281,6 +1511,7 @@
                     }
 
                     // Check Company Tab visibility
+                    document.getElementById('nav-accountability').style.display = 'flex';
                     if (data.company_code) {
                         document.getElementById('nav-team').style.display = 'flex';
                         if (data.role === 'admin' || data.role === 'admin_empresa') {
@@ -2173,6 +2404,230 @@
 
             btn.innerHTML = '<i class="ph ph-check-square"></i> Guardar y Aplicar';
             btn.disabled = false;
+        }
+
+        // --- Accountability Tab Logic ---
+        async function loadAccountabilityData() {
+            if (!window.sellerData || !window.sellerData.id) return;
+            const userId = window.sellerData.id;
+            
+            try {
+                const res = await fetch(`/seller/${userId}/accountability/logs`);
+                if (res.ok) {
+                    const data = await res.json();
+                    
+                    // Helper to update progress and bars
+                    function updateMetric(type) {
+                        const todayAct = data.today[type] || 0;
+                        const todayGoal = data.plan.daily[type] || 0;
+                        const todayText = document.getElementById(`act_${type}_today`);
+                        const todayBar = document.getElementById(`bar_${type}_today`);
+                        
+                        todayText.textContent = `${todayAct} de ${todayGoal}`;
+                        let todayPct = todayGoal > 0 ? (todayAct / todayGoal) * 100 : 0;
+                        todayBar.style.width = `${Math.min(todayPct, 100)}%`;
+                        
+                        const weeklyAct = data.weekly[type] || 0;
+                        const weeklyGoal = data.plan.weekly[type] || 0;
+                        const weeklyText = document.getElementById(`act_${type}_weekly`);
+                        const weeklyBar = document.getElementById(`bar_${type}_weekly`);
+                        
+                        weeklyText.textContent = `${weeklyAct} de ${weeklyGoal}`;
+                        let weeklyPct = weeklyGoal > 0 ? (weeklyAct / weeklyGoal) * 100 : 0;
+                        weeklyBar.style.width = `${Math.min(weeklyPct, 100)}%`;
+                        
+                        const monthlyAct = data.monthly[type] || 0;
+                        const monthlyGoal = data.plan.monthly[type] || 0;
+                        const monthlyText = document.getElementById(`act_${type}_monthly`);
+                        const monthlyBar = document.getElementById(`bar_${type}_monthly`);
+                        
+                        monthlyText.textContent = `${monthlyAct} de ${monthlyGoal}`;
+                        let monthlyPct = monthlyGoal > 0 ? (monthlyAct / monthlyGoal) * 100 : 0;
+                        monthlyBar.style.width = `${Math.min(monthlyPct, 100)}%`;
+                    }
+                    
+                    updateMetric('citas');
+                    updateMetric('llamadas');
+                    updateMetric('propuestas');
+                    
+                    // Fill inputs for daily logging
+                    document.getElementById('log_citas_input').value = data.today.citas;
+                    document.getElementById('log_llamadas_input').value = data.today.llamadas;
+                    document.getElementById('log_propuestas_input').value = data.today.propuestas;
+                    
+                    // Fill plan inputs
+                    document.getElementById('plan_citas_diaria').value = data.plan.daily.citas;
+                    document.getElementById('plan_citas_semanal').value = data.plan.weekly.citas;
+                    document.getElementById('plan_citas_mensual').value = data.plan.monthly.citas;
+                    
+                    document.getElementById('plan_llamadas_diaria').value = data.plan.daily.llamadas;
+                    document.getElementById('plan_llamadas_semanal').value = data.plan.weekly.llamadas;
+                    document.getElementById('plan_llamadas_mensual').value = data.plan.monthly.llamadas;
+                    
+                    document.getElementById('plan_propuestas_diaria').value = data.plan.daily.propuestas;
+                    document.getElementById('plan_propuestas_semanal').value = data.plan.weekly.propuestas;
+                    document.getElementById('plan_propuestas_mensual').value = data.plan.monthly.propuestas;
+                    
+                    // Load calendar events
+                    await loadAccountabilityCalendarEvents();
+                }
+            } catch (e) {
+                console.error("Error loading accountability logs:", e);
+            }
+        }
+        
+        async function loadAccountabilityCalendarEvents() {
+            if (!window.sellerData || !window.sellerData.id) return;
+            const userId = window.sellerData.id;
+            const container = document.getElementById('accountability-calendar-events-list');
+            
+            try {
+                const res = await fetch(`/seller/${userId}/accountability/calendar-events`);
+                if (res.ok) {
+                    const events = await res.json();
+                    if (!events || events.length === 0) {
+                        container.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:10px;">No tienes citas programadas para hoy.</div>';
+                        return;
+                    }
+                    
+                    let html = '';
+                    events.forEach(e => {
+                        let statusHtml = '';
+                        if (e.is_completed) {
+                            statusHtml = '<span class="badge badge-success" style="background:#10b981; color:#fff; padding:4px 8px; border-radius:4px; font-size:11px;"><i class="ph ph-check"></i> Realizada</span>';
+                        } else if (e.audit_status === 'no_show') {
+                            statusHtml = '<span class="badge badge-danger" style="background:#ef4444; color:#fff; padding:4px 8px; border-radius:4px; font-size:11px;"><i class="ph ph-x"></i> No se realizó</span>';
+                        } else {
+                            // Pending audit buttons
+                            const escapedSummary = (e.summary || 'Cita').replace(/'/g, "\\'").replace(/"/g, '\\"');
+                            statusHtml = `
+                                <div style="display:flex; gap:8px;">
+                                    <button class="btn btn-sm" onclick="postCompleteCalendarEvent('${e.id}', true, '${escapedSummary}', '${e.start}')" style="padding: 4px 8px; font-size:11px;"><i class="ph ph-check"></i> Sí</button>
+                                    <button class="btn btn-sm btn-outline" onclick="postCompleteCalendarEvent('${e.id}', false, '${escapedSummary}', '${e.start}')" style="padding: 4px 8px; font-size:11px;"><i class="ph ph-x"></i> No</button>
+                                </div>
+                            `;
+                        }
+                        
+                        // Format start time if available
+                        let timeStr = 'Todo el día';
+                        if (e.start && e.start.includes('T')) {
+                            const timePart = e.start.split('T')[1];
+                            timeStr = timePart.substring(0, 5);
+                        }
+                        
+                        html += `
+                            <div class="glass" style="padding:12px; border-radius:8px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                                <div>
+                                    <h4 style="margin:0; font-family:'Outfit'; font-size:14px; color:#fff;">${e.summary}</h4>
+                                    <p style="margin:4px 0 0 0; font-size:12px; color:var(--text-muted);"><i class="ph ph-clock"></i> ${timeStr}</p>
+                                </div>
+                                <div>
+                                    ${statusHtml}
+                                </div>
+                            </div>
+                        `;
+                    });
+                    container.innerHTML = html;
+                } else {
+                    container.innerHTML = '<div style="text-align:center; color:var(--warning); padding:10px;">Conecta tu cuenta de Google Calendar para visualizar tus citas de hoy.</div>';
+                }
+            } catch (e) {
+                console.error("Error loading accountability calendar events:", e);
+                container.innerHTML = '<div style="text-align:center; color:var(--danger); padding:10px;">Error al conectar con el servidor.</div>';
+            }
+        }
+        
+        async function saveDailyActivityLog() {
+            if (!window.sellerData || !window.sellerData.id) return;
+            const userId = window.sellerData.id;
+            
+            const citas = parseInt(document.getElementById('log_citas_input').value) || 0;
+            const llamadas = parseInt(document.getElementById('log_llamadas_input').value) || 0;
+            const propuestas = parseInt(document.getElementById('log_propuestas_input').value) || 0;
+            const dateStr = new Date().toISOString().split('T')[0];
+            
+            try {
+                const res = await fetch(`/seller/${userId}/accountability/logs`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        date_str: dateStr,
+                        citas: citas,
+                        llamadas: llamadas,
+                        propuestas: propuestas
+                    })
+                });
+                
+                if (res.ok) {
+                    alert("Actividades diarias guardadas exitosamente.");
+                    await loadAccountabilityData();
+                } else {
+                    alert("Error al guardar actividades diarias.");
+                }
+            } catch (e) {
+                console.error("Error saving daily logs:", e);
+            }
+        }
+        
+        async function saveAccountabilityPlan() {
+            if (!window.sellerData || !window.sellerData.id) return;
+            const userId = window.sellerData.id;
+            
+            const payload = {
+                citas_meta_diaria: parseInt(document.getElementById('plan_citas_diaria').value) || 0,
+                citas_meta_semanal: parseInt(document.getElementById('plan_citas_semanal').value) || 0,
+                citas_meta_mensual: parseInt(document.getElementById('plan_citas_mensual').value) || 0,
+                
+                llamadas_meta_diaria: parseInt(document.getElementById('plan_llamadas_diaria').value) || 0,
+                llamadas_meta_semanal: parseInt(document.getElementById('plan_llamadas_semanal').value) || 0,
+                llamadas_meta_mensual: parseInt(document.getElementById('plan_llamadas_mensual').value) || 0,
+                
+                propuestas_meta_diaria: parseInt(document.getElementById('plan_propuestas_diaria').value) || 0,
+                propuestas_meta_semanal: parseInt(document.getElementById('plan_propuestas_semanal').value) || 0,
+                propuestas_meta_mensual: parseInt(document.getElementById('plan_propuestas_mensual').value) || 0
+            };
+            
+            try {
+                const res = await fetch(`/seller/${userId}/accountability/plan`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                
+                if (res.ok) {
+                    alert("Plan de accountability actualizado correctamente.");
+                    await loadAccountabilityData();
+                } else {
+                    alert("Error al guardar el plan de metas.");
+                }
+            } catch (e) {
+                console.error("Error saving accountability plan:", e);
+            }
+        }
+        
+        async function postCompleteCalendarEvent(eventId, isCompleted, summary, startTime) {
+            if (!window.sellerData || !window.sellerData.id) return;
+            const userId = window.sellerData.id;
+            
+            try {
+                const res = await fetch(`/seller/${userId}/accountability/calendar-events/${eventId}/complete`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        is_completed: isCompleted,
+                        summary: summary,
+                        start_time: startTime
+                    })
+                });
+                
+                if (res.ok) {
+                    await loadAccountabilityData();
+                } else {
+                    alert("Error al registrar estado de la reunión.");
+                }
+            } catch (e) {
+                console.error("Error marking meeting completed:", e);
+            }
         }
     </script>
 </body>

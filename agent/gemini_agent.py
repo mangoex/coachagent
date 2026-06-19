@@ -48,6 +48,7 @@ class GeminiAgent:
                     "Tienes acceso a herramientas de Google Workspace (Calendar, Sheets, Docs).\n"
                     "Cuando se te solicite leer el CRM o ver los clientes/productos/precios, lee el CRM en Google Sheets.\n"
                     "Cuando se apruebe una cotización, usa la herramienta generate_quotation para generar la propuesta y devuélvele al vendedor el enlace firmado del PDF resultante.\n"
+                    "Tienes acceso a herramientas de accountability: si el vendedor te dice que hoy realizó llamadas, citas o propuestas, puedes usar la herramienta log_user_activities para registrarlas. También puedes usar get_user_accountability_progress para verificar cómo va el vendedor con respecto a sus metas diarias, semanales y mensuales y decírselo de forma motivadora y concisa.\n"
                     "Mantén un tono profesional, motivador, conciso y enfocado a objetivos comerciales. Responde en español.\n"
                 )
                 
@@ -299,6 +300,170 @@ class GeminiAgent:
                 logger.error(f"Error scheduling task: {str(e)}")
                 return f"Error scheduling task: {str(e)}"
 
+        def log_user_activities(citas: int = 0, llamadas: int = 0, propuestas: int = 0, date_str: str = "") -> str:
+            """
+            Registra o incrementa actividades de venta (citas, llamadas, propuestas) realizadas por el vendedor.
+            Usa esta herramienta cuando el usuario te mencione que realizó llamadas, citas o propuestas.
+            
+            Args:
+                citas: Número de citas a sumar (positivo) o establecer.
+                llamadas: Número de llamadas a sumar (positivo) o establecer.
+                propuestas: Número de propuestas a sumar (positivo) o establecer.
+                date_str: Fecha opcional en formato 'YYYY-MM-DD'. Si está vacía, se asume hoy.
+            """
+            if not self.phone_number:
+                return "Error: No se dispone del número telefónico para registrar la actividad."
+            
+            from database.connection import SessionLocal
+            from database.models import User, DailyActivityLog
+            from datetime import datetime
+            import pytz
+
+            db = SessionLocal()
+            try:
+                user = db.query(User).filter(User.phone_number == self.phone_number).first()
+                if not user:
+                    return f"Error: No se encontró vendedor registrado con el teléfono {self.phone_number}."
+
+                # Determinar zona horaria
+                cal_tz = "America/Mexico_City"
+                if self.refresh_token:
+                    try:
+                        metadata = GoogleCalendarService.get_calendar_metadata(self.refresh_token, self.calendar_id)
+                        cal_tz = metadata.get("timeZone", "America/Mexico_City")
+                    except Exception:
+                        pass
+                tz = pytz.timezone(cal_tz)
+                now_local = datetime.now(tz)
+
+                if date_str:
+                    try:
+                        log_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+                    except ValueError:
+                        return "Error: Formato de fecha inválido. Usar YYYY-MM-DD."
+                else:
+                    log_date = now_local.date()
+
+                # Buscar o crear log para esa fecha
+                log = db.query(DailyActivityLog).filter(
+                    DailyActivityLog.user_id == user.id,
+                    DailyActivityLog.date == log_date
+                ).first()
+
+                if not log:
+                    log = DailyActivityLog(user_id=user.id, date=log_date)
+                    db.add(log)
+                    db.flush()
+
+                # Incrementamos las actividades
+                log.citas_completadas += citas
+                log.llamadas_completadas += llamadas
+                log.propuestas_completadas += propuestas
+                db.commit()
+
+                return (
+                    f"Actividades registradas exitosamente para el día {log_date.isoformat()}:\n"
+                    f"- Citas hoy: {log.citas_completadas} (se agregaron +{citas})\n"
+                    f"- Llamadas hoy: {log.llamadas_completadas} (se agregaron +{llamadas})\n"
+                    f"- Propuestas hoy: {log.propuestas_completadas} (se agregaron +{propuestas})\n"
+                )
+            except Exception as e:
+                db.rollback()
+                logger.error(f"Error log_user_activities tool: {e}")
+                return f"Error registrando actividades: {str(e)}"
+            finally:
+                db.close()
+
+        def get_user_accountability_progress() -> str:
+            """
+            Consulta el progreso actual de las metas y avance de actividades diarias, semanales y mensuales del vendedor.
+            Úsala para informarle al vendedor cuántas llamadas, citas o propuestas lleva y qué porcentaje de su meta ha alcanzado.
+            """
+            if not self.phone_number:
+                return "Error: No se dispone del número telefónico para consultar el progreso."
+
+            from database.connection import SessionLocal
+            from database.models import User, AccountabilityPlan, DailyActivityLog
+            from datetime import datetime, timedelta
+            import pytz
+
+            db = SessionLocal()
+            try:
+                user = db.query(User).filter(User.phone_number == self.phone_number).first()
+                if not user:
+                    return f"Error: No se encontró vendedor registrado con el teléfono {self.phone_number}."
+
+                cal_tz = "America/Mexico_City"
+                if self.refresh_token:
+                    try:
+                        metadata = GoogleCalendarService.get_calendar_metadata(self.refresh_token, self.calendar_id)
+                        cal_tz = metadata.get("timeZone", "America/Mexico_City")
+                    except Exception:
+                        pass
+                tz = pytz.timezone(cal_tz)
+                now_local = datetime.now(tz)
+                today = now_local.date()
+
+                start_month = today.replace(day=1)
+                start_week = today - timedelta(days=today.weekday())
+
+                # Consultar plan de metas
+                plan = db.query(AccountabilityPlan).filter(AccountabilityPlan.user_id == user.id).first()
+                if not plan:
+                    return "Aún no has definido tus metas de actividades. Te sugiero crearlas en tu panel de control web."
+
+                # Consultar logs de actividades
+                logs = db.query(DailyActivityLog).filter(
+                    DailyActivityLog.user_id == user.id,
+                    DailyActivityLog.date >= start_month
+                ).all()
+
+                # Sumar acumulados
+                today_acts = {"citas": 0, "llamadas": 0, "propuestas": 0}
+                weekly_acts = {"citas": 0, "llamadas": 0, "propuestas": 0}
+                monthly_acts = {"citas": 0, "llamadas": 0, "propuestas": 0}
+
+                for log in logs:
+                    if log.date == today:
+                        today_acts["citas"] = log.citas_completadas
+                        today_acts["llamadas"] = log.llamadas_completadas
+                        today_acts["propuestas"] = log.propuestas_completadas
+                    if log.date >= start_week:
+                        weekly_acts["citas"] += log.citas_completadas
+                        weekly_acts["llamadas"] += log.llamadas_completadas
+                        weekly_acts["propuestas"] += log.propuestas_completadas
+                    monthly_acts["citas"] += log.citas_completadas
+                    monthly_acts["llamadas"] += log.llamadas_completadas
+                    monthly_acts["propuestas"] += log.propuestas_completadas
+
+                def report_section(name, actual, target):
+                    if target <= 0:
+                        return f"  - {name}: {actual} (meta no definida)"
+                    pct = (actual / target) * 100
+                    return f"  - {name}: {actual} de {target} ({pct:.1f}%)"
+
+                res = (
+                    f"Progreso de Accountability para {user.name} (Local: {today.isoformat()}):\n\n"
+                    f"📅 METAS DIARIAS:\n"
+                    f"{report_section('Citas', today_acts['citas'], plan.citas_meta_diaria)}\n"
+                    f"{report_section('Llamadas', today_acts['llamadas'], plan.llamadas_meta_diaria)}\n"
+                    f"{report_section('Propuestas', today_acts['propuestas'], plan.propuestas_meta_diaria)}\n\n"
+                    f"📆 METAS SEMANALES:\n"
+                    f"{report_section('Citas', weekly_acts['citas'], plan.citas_meta_semanal)}\n"
+                    f"{report_section('Llamadas', weekly_acts['llamadas'], plan.llamadas_meta_semanal)}\n"
+                    f"{report_section('Propuestas', weekly_acts['propuestas'], plan.propuestas_meta_semanal)}\n\n"
+                    f"🗂 METAS MENSUALES:\n"
+                    f"{report_section('Citas', monthly_acts['citas'], plan.citas_meta_mensual)}\n"
+                    f"{report_section('Llamadas', monthly_acts['llamadas'], plan.llamadas_meta_mensual)}\n"
+                    f"{report_section('Propuestas', monthly_acts['propuestas'], plan.propuestas_meta_mensual)}\n"
+                )
+                return res
+            except Exception as e:
+                logger.error(f"Error get_user_accountability_progress tool: {e}")
+                return f"Error consultando progreso: {str(e)}"
+            finally:
+                db.close()
+
         self.tools_map = {
             "list_calendar_events": list_calendar_events,
             "create_calendar_event": create_calendar_event,
@@ -306,7 +471,9 @@ class GeminiAgent:
             "delete_calendar_event": delete_calendar_event,
             "read_crm_data": read_crm_data,
             "generate_quotation": generate_quotation,
-            "schedule_followup": schedule_followup
+            "schedule_followup": schedule_followup,
+            "log_user_activities": log_user_activities,
+            "get_user_accountability_progress": get_user_accountability_progress
         }
         declarations = [FunctionDeclaration.from_func(func) for func in self.tools_map.values()]
         self.tools_list = Tool(function_declarations=declarations)

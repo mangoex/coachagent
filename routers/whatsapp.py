@@ -5,7 +5,7 @@ import json
 
 from config.settings import settings
 from database.connection import get_db
-from database.models import User, ConversationLog, Company
+from database.models import User, ConversationLog, Company, CalendarEventAudit, DailyActivityLog
 from services.whatsapp_service import WhatsAppService
 from services.calendar_service import GoogleCalendarService
 from agent.redis_memory import redis_memory
@@ -130,11 +130,69 @@ async def receive_message(request: Request, db: Session = Depends(get_db)):
         meeting_id = state_meta.get("meeting_id")
         meeting_summary = state_meta.get("meeting_summary", "reunión")
         
+        # Extract event_id from button_id if formatted as btn_yes_eventid / btn_no_eventid
+        event_id = meeting_id
+        if button_id.startswith("btn_yes_"):
+            event_id = button_id[8:]
+        elif button_id.startswith("btn_no_"):
+            event_id = button_id[7:]
+            
+        from database.models import CalendarEventAudit, DailyActivityLog
+        import pytz
+        from datetime import datetime
+        
+        audit = db.query(CalendarEventAudit).filter(
+            CalendarEventAudit.user_id == user.id,
+            CalendarEventAudit.event_id == event_id
+        ).first()
+        
+        was_completed = audit.is_completed if audit else False
+        
         if button_id.startswith("btn_yes"):
+            # Mark event completed in DB
+            if not audit:
+                audit = CalendarEventAudit(
+                    user_id=user.id,
+                    event_id=event_id,
+                    event_summary=meeting_summary,
+                    is_completed=True,
+                    audit_status="confirmed"
+                )
+                db.add(audit)
+            else:
+                audit.is_completed = True
+                audit.audit_status = "confirmed"
+            db.commit()
+            
+            # Increment DailyActivityLog
+            if not was_completed:
+                cal_tz = "America/Mexico_City"
+                try:
+                    metadata = GoogleCalendarService.get_calendar_metadata(refresh_token, user.calendar_id)
+                    cal_tz = metadata.get("timeZone", "America/Mexico_City")
+                except Exception:
+                    pass
+                tz = pytz.timezone(cal_tz)
+                if audit and audit.event_start:
+                    dt_local = audit.event_start.astimezone(tz) if audit.event_start.tzinfo else tz.localize(audit.event_start)
+                    log_date = dt_local.date()
+                else:
+                    log_date = datetime.now(tz).date()
+                    
+                log = db.query(DailyActivityLog).filter(
+                    DailyActivityLog.user_id == user.id,
+                    DailyActivityLog.date == log_date
+                ).first()
+                if not log:
+                    log = DailyActivityLog(user_id=user.id, date=log_date)
+                    db.add(log)
+                log.citas_completadas += 1
+                db.commit()
+                
             # Clear state
             redis_memory.clear_state(from_phone)
             reply_text = (
-                f"¡Excelente noticia! Me alegra que se haya realizado la reunión '{meeting_summary}'.\n\n"
+                f"¡Excelente noticia! He registrado tu cita '{meeting_summary}' como realizada y la sumé a tus metas de hoy.\n\n"
                 "¿Necesitas generar una cotización para este cliente? Si es así, dime el nombre del cliente, "
                 "producto, cantidad y precio base. ¡Yo me encargo del resto!"
             )
@@ -147,12 +205,27 @@ async def receive_message(request: Request, db: Session = Depends(get_db)):
             return {"status": "ok"}
             
         elif button_id.startswith("btn_no"):
+            # Mark event not completed in DB
+            if not audit:
+                audit = CalendarEventAudit(
+                    user_id=user.id,
+                    event_id=event_id,
+                    event_summary=meeting_summary,
+                    is_completed=False,
+                    audit_status="no_show"
+                )
+                db.add(audit)
+            else:
+                audit.is_completed = False
+                audit.audit_status = "no_show"
+            db.commit()
+            
             # Clear state
             redis_memory.clear_state(from_phone)
             
             # Propose rescheduling slot
             reply_text = (
-                f"Entendido. Vamos a reprogramar la junta '{meeting_summary}'.\n\n"
+                f"Entendido. He marcado la cita '{meeting_summary}' como no realizada en tu registro.\n\n"
                 "Revisando tu agenda de Google Calendar, he encontrado estos espacios disponibles para mañana:\n"
                 "- 10:00 AM - 11:00 AM\n"
                 "- 03:00 PM - 04:00 PM\n\n"
@@ -165,6 +238,7 @@ async def receive_message(request: Request, db: Session = Depends(get_db)):
             db.add(db_log_out)
             db.commit()
             return {"status": "ok"}
+
 
     # 2. Default flow: Send message to Cognitive Gemini Agent
     chat_history = redis_memory.get_history(from_phone)

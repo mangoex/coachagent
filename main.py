@@ -13,7 +13,7 @@ from firebase_admin import credentials, auth as firebase_auth
 from google_auth_oauthlib.flow import Flow
 
 from database.connection import Base, engine, get_db
-from database.models import User, ConversationLog, Company
+from database.models import User, ConversationLog, Company, AccountabilityPlan, DailyActivityLog, CalendarEventAudit
 from agent.redis_memory import redis_memory
 from agent.gemini_agent import GeminiAgent
 from routers import whatsapp, cron, audit
@@ -377,6 +377,312 @@ def calculate_seller_goals_ai(payload: AIGoalsCalculationRequest):
             "objectives": f"Enfoque sugerido:\n1. Vender {payload.product_service}.\n2. Realizar llamadas de prospección semanal.\n3. Agendar citas en Google Calendar."
         }
 
+
+class AccountabilityPlanUpdate(BaseModel):
+    citas_meta_mensual: int
+    citas_meta_semanal: int
+    citas_meta_diaria: int
+    llamadas_meta_mensual: int
+    llamadas_meta_semanal: int
+    llamadas_meta_diaria: int
+    propuestas_meta_mensual: int
+    propuestas_meta_semanal: int
+    propuestas_meta_diaria: int
+
+
+class DailyActivityLogUpdate(BaseModel):
+    date_str: str  # YYYY-MM-DD
+    citas: int
+    llamadas: int
+    propuestas: int
+
+
+class EventCompletionRequest(BaseModel):
+    is_completed: bool
+    summary: Optional[str] = None
+    start_time: Optional[str] = None
+
+
+@app.get("/seller/{user_id}/accountability/plan")
+def get_accountability_plan(user_id: int, db: Session = Depends(get_db)):
+    plan = db.query(AccountabilityPlan).filter(AccountabilityPlan.user_id == user_id).first()
+    if not plan:
+        # Create a default plan with all zeros
+        plan = AccountabilityPlan(
+            user_id=user_id,
+            citas_meta_mensual=0, citas_meta_semanal=0, citas_meta_diaria=0,
+            llamadas_meta_mensual=0, llamadas_meta_semanal=0, llamadas_meta_diaria=0,
+            propuestas_meta_mensual=0, propuestas_meta_semanal=0, propuestas_meta_diaria=0
+        )
+        db.add(plan)
+        db.commit()
+        db.refresh(plan)
+    return plan
+
+
+@app.put("/seller/{user_id}/accountability/plan")
+def update_accountability_plan(user_id: int, payload: AccountabilityPlanUpdate, db: Session = Depends(get_db)):
+    plan = db.query(AccountabilityPlan).filter(AccountabilityPlan.user_id == user_id).first()
+    if not plan:
+        plan = AccountabilityPlan(user_id=user_id)
+        db.add(plan)
+    
+    plan.citas_meta_mensual = payload.citas_meta_mensual
+    plan.citas_meta_semanal = payload.citas_meta_semanal
+    plan.citas_meta_diaria = payload.citas_meta_diaria
+    
+    plan.llamadas_meta_mensual = payload.llamadas_meta_mensual
+    plan.llamadas_meta_semanal = payload.llamadas_meta_semanal
+    plan.llamadas_meta_diaria = payload.llamadas_meta_diaria
+    
+    plan.propuestas_meta_mensual = payload.propuestas_meta_mensual
+    plan.propuestas_meta_semanal = payload.propuestas_meta_semanal
+    plan.propuestas_meta_diaria = payload.propuestas_meta_diaria
+    
+    db.commit()
+    db.refresh(plan)
+    return plan
+
+
+@app.get("/seller/{user_id}/accountability/logs")
+def get_accountability_logs(user_id: int, db: Session = Depends(get_db)):
+    import pytz
+    from datetime import datetime, timedelta
+    
+    seller = db.query(User).filter(User.id == user_id).first()
+    if not seller:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        
+    cal_tz = "America/Mexico_City"
+    try:
+        refresh_token = seller.get_refresh_token()
+        if refresh_token:
+            metadata = GoogleCalendarService.get_calendar_metadata(refresh_token, seller.calendar_id)
+            cal_tz = metadata.get("timeZone", "America/Mexico_City")
+    except Exception:
+        pass
+        
+    tz = pytz.timezone(cal_tz)
+    now_local = datetime.now(tz)
+    today = now_local.date()
+    
+    # Calculate boundaries
+    start_month = today.replace(day=1)
+    start_week = today - timedelta(days=today.weekday())
+    
+    # Query logs from start of month
+    logs = db.query(DailyActivityLog).filter(
+        DailyActivityLog.user_id == user_id,
+        DailyActivityLog.date >= start_month
+    ).all()
+    
+    # Sum up actuals
+    today_log = {"citas": 0, "llamadas": 0, "propuestas": 0}
+    weekly = {"citas": 0, "llamadas": 0, "propuestas": 0}
+    monthly = {"citas": 0, "llamadas": 0, "propuestas": 0}
+    
+    for log in logs:
+        # Check today
+        if log.date == today:
+            today_log["citas"] = log.citas_completadas
+            today_log["llamadas"] = log.llamadas_completadas
+            today_log["propuestas"] = log.propuestas_completadas
+        
+        # Check current week
+        if log.date >= start_week:
+            weekly["citas"] += log.citas_completadas
+            weekly["llamadas"] += log.llamadas_completadas
+            weekly["propuestas"] += log.propuestas_completadas
+            
+        # Monthly is all logs since start_month
+        monthly["citas"] += log.citas_completadas
+        monthly["llamadas"] += log.llamadas_completadas
+        monthly["propuestas"] += log.propuestas_completadas
+        
+    # Get plan
+    plan = db.query(AccountabilityPlan).filter(AccountabilityPlan.user_id == user_id).first()
+    plan_data = {
+        "daily": {"citas": 0, "llamadas": 0, "propuestas": 0},
+        "weekly": {"citas": 0, "llamadas": 0, "propuestas": 0},
+        "monthly": {"citas": 0, "llamadas": 0, "propuestas": 0}
+    }
+    if plan:
+        plan_data["daily"] = {"citas": plan.citas_meta_diaria, "llamadas": plan.llamadas_meta_diaria, "propuestas": plan.propuestas_meta_diaria}
+        plan_data["weekly"] = {"citas": plan.citas_meta_semanal, "llamadas": plan.llamadas_meta_semanal, "propuestas": plan.propuestas_meta_semanal}
+        plan_data["monthly"] = {"citas": plan.citas_meta_mensual, "llamadas": plan.llamadas_meta_mensual, "propuestas": plan.propuestas_meta_mensual}
+        
+    return {
+        "today": today_log,
+        "weekly": weekly,
+        "monthly": monthly,
+        "plan": plan_data,
+        "date": today.isoformat()
+    }
+
+
+@app.post("/seller/{user_id}/accountability/logs")
+def update_daily_activity_log(user_id: int, payload: DailyActivityLogUpdate, db: Session = Depends(get_db)):
+    from datetime import datetime
+    try:
+        log_date = datetime.strptime(payload.date_str, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Formato de fecha inválido. Usar YYYY-MM-DD")
+        
+    log = db.query(DailyActivityLog).filter(
+        DailyActivityLog.user_id == user_id,
+        DailyActivityLog.date == log_date
+    ).first()
+    
+    if not log:
+        log = DailyActivityLog(user_id=user_id, date=log_date)
+        db.add(log)
+        
+    log.citas_completadas = payload.citas
+    log.llamadas_completadas = payload.llamadas
+    log.propuestas_completadas = payload.propuestas
+    
+    db.commit()
+    db.refresh(log)
+    return {
+        "status": "ok",
+        "date": log.date.isoformat(),
+        "citas": log.citas_completadas,
+        "llamadas": log.llamadas_completadas,
+        "propuestas": log.propuestas_completadas
+    }
+
+
+@app.get("/seller/{user_id}/accountability/calendar-events")
+def get_seller_calendar_events(user_id: int, db: Session = Depends(get_db)):
+    seller = db.query(User).filter(User.id == user_id).first()
+    if not seller:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        
+    try:
+        refresh_token = seller.get_refresh_token()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Google OAuth no configurado")
+        
+    import pytz
+    from datetime import datetime
+    cal_tz = "America/Mexico_City"
+    try:
+        metadata = GoogleCalendarService.get_calendar_metadata(refresh_token, seller.calendar_id)
+        cal_tz = metadata.get("timeZone", "America/Mexico_City")
+    except Exception:
+        pass
+        
+    tz = pytz.timezone(cal_tz)
+    now_local = datetime.now(tz)
+    today_str = now_local.strftime("%Y-%m-%d")
+    
+    # List events
+    try:
+        events = GoogleCalendarService.list_events(refresh_token, today_str, seller.calendar_id)
+    except Exception as e:
+        logger.error(f"Error listing events for accountability: {e}")
+        events = []
+        
+    # Get audit status from database for these events
+    event_ids = [e["id"] for e in events if e.get("id")]
+    audits = db.query(CalendarEventAudit).filter(
+        CalendarEventAudit.user_id == user_id,
+        CalendarEventAudit.event_id.in_(event_ids)
+    ).all() if event_ids else []
+    
+    audit_map = {a.event_id: a for a in audits}
+    
+    enriched_events = []
+    for e in events:
+        eid = e.get("id")
+        audit = audit_map.get(eid)
+        
+        enriched_events.append({
+            "id": eid,
+            "summary": e.get("summary", "Sin Título"),
+            "start": e.get("start"),
+            "end": e.get("end"),
+            "is_completed": audit.is_completed if audit else False,
+            "audit_status": audit.audit_status if audit else "pending"
+        })
+        
+    return enriched_events
+
+
+@app.post("/seller/{user_id}/accountability/calendar-events/{event_id}/complete")
+def complete_calendar_event(user_id: int, event_id: str, payload: EventCompletionRequest, db: Session = Depends(get_db)):
+    import pytz
+    from datetime import datetime
+    
+    audit = db.query(CalendarEventAudit).filter(
+        CalendarEventAudit.user_id == user_id,
+        CalendarEventAudit.event_id == event_id
+    ).first()
+    
+    was_completed = audit.is_completed if audit else False
+    
+    if not audit:
+        # Determine start date
+        event_start_dt = None
+        if payload.start_time:
+            try:
+                event_start_dt = datetime.fromisoformat(payload.start_time.replace("Z", "+00:00"))
+            except ValueError:
+                pass
+        
+        audit = CalendarEventAudit(
+            user_id=user_id,
+            event_id=event_id,
+            event_summary=payload.summary or "Cita",
+            event_start=event_start_dt,
+            is_completed=payload.is_completed,
+            audit_status="confirmed" if payload.is_completed else "no_show"
+        )
+        db.add(audit)
+    else:
+        audit.is_completed = payload.is_completed
+        audit.audit_status = "confirmed" if payload.is_completed else "no_show"
+        
+    db.commit()
+    db.refresh(audit)
+    
+    # If completion status changed to True, increment DailyActivityLog.citas_completadas for the event's date
+    if payload.is_completed and not was_completed:
+        # Get event's date in local timezone or current date
+        seller = db.query(User).filter(User.id == user_id).first()
+        cal_tz = "America/Mexico_City"
+        try:
+            refresh_token = seller.get_refresh_token()
+            if refresh_token:
+                metadata = GoogleCalendarService.get_calendar_metadata(refresh_token, seller.calendar_id)
+                cal_tz = metadata.get("timeZone", "America/Mexico_City")
+        except Exception:
+            pass
+            
+        tz = pytz.timezone(cal_tz)
+        if audit.event_start:
+            # Convert event_start (naive or aware) to user local time
+            dt_local = audit.event_start.astimezone(tz) if audit.event_start.tzinfo else tz.localize(audit.event_start)
+            log_date = dt_local.date()
+        else:
+            log_date = datetime.now(tz).date()
+            
+        # Get log for this date
+        log = db.query(DailyActivityLog).filter(
+            DailyActivityLog.user_id == user_id,
+            DailyActivityLog.date == log_date
+        ).first()
+        
+        if not log:
+            log = DailyActivityLog(user_id=user_id, date=log_date)
+            db.add(log)
+            
+        log.citas_completadas += 1
+        db.commit()
+        
+    return {"status": "ok", "event_id": event_id, "is_completed": audit.is_completed}
+
+
 @app.put("/auth/seller/{user_id}/google")
 def update_google_token(user_id: int, payload: GoogleTokenUpdate, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == user_id).first()
@@ -557,15 +863,12 @@ def asistto_webhook(payload: WebhookPayload, background_tasks: BackgroundTasks, 
         # Ignore messages from numbers not registered as salespeople
         return {"status": "ignored", "reason": "Not a registered salesperson"}
     
-    if not user.company:
-        return {"status": "error", "reason": "User has no company assigned"}
+    # Resolve company credentials if any, otherwise fall back to global settings
+    wa_token = user.company.get_whatsapp_token() if user.company else settings.WHATSAPP_TOKEN
+    wa_phone_id = user.company.whatsapp_phone_number_id if user.company else settings.WHATSAPP_PHONE_NUMBER_ID
     
-    # Get WhatsApp credentials from Company
-    wa_token = user.company.get_whatsapp_token()
-    wa_phone_id = user.company.whatsapp_phone_number_id
-    
-    if not wa_token or not wa_phone_id:
-        logger.warning(f"Company {user.company.name} has no WhatsApp credentials configured.")
+    if not wa_token or not wa_phone_id or wa_token == "EAAXxXX..." or wa_phone_id == "1234567890":
+        logger.warning(f"No valid WhatsApp credentials for user {user.email}.")
         return {"status": "error", "reason": "No WhatsApp credentials configured"}
 
     # We process the message in the background to return a fast 200 OK to the Webhook provider
@@ -602,7 +905,8 @@ def process_incoming_whatsapp_message(user_id: int, phone: str, message: str, wa
             template_doc_id=user.template_doc_id,
             sales_goals=user.sales_goals,
             objectives=user.objectives,
-            calendar_id=user.calendar_id
+            calendar_id=user.calendar_id,
+            phone_number=phone
         )
 
         reply, updated_history = agent.run(chat_history, message)
@@ -643,7 +947,8 @@ def agent_chat(payload: ChatRequest, db: Session = Depends(get_db)):
         template_doc_id=user.template_doc_id,
         sales_goals=user.sales_goals,
         objectives=user.objectives,
-        calendar_id=user.calendar_id
+        calendar_id=user.calendar_id,
+        phone_number=payload.phone_number
     )
 
     reply, updated_history = agent.run(chat_history, payload.message)
