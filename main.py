@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, Request
+from fastapi import FastAPI, Depends, HTTPException, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
@@ -125,6 +125,9 @@ class SellerUpdate(BaseModel):
     phone_number: Optional[str] = None
     sales_goals: Optional[str] = None
 
+class GoogleTokenUpdate(BaseModel):
+    google_refresh_token: str
+
 # Setup OAuth Flow helper
 SCOPES = [
     'https://www.googleapis.com/auth/calendar',
@@ -212,6 +215,34 @@ def update_seller_goals(user_id: int, payload: SellerUpdate, db: Session = Depen
     
     db.commit()
     return {"status": "ok", "sales_goals": seller.sales_goals}
+
+@app.put("/auth/seller/{user_id}/google")
+def update_google_token(user_id: int, payload: GoogleTokenUpdate, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    user.set_refresh_token(payload.google_refresh_token)
+    db.commit()
+    return {"status": "ok"}
+
+@app.get("/api/sellers/{user_id}/upcoming")
+def get_upcoming_events(user_id: int, db: Session = Depends(get_db)):
+    from services.calendar_service import GoogleCalendarService
+    seller = db.query(User).filter(User.id == user_id).first()
+    if not seller:
+        raise HTTPException(status_code=404, detail="Vendedor no encontrado")
+    
+    refresh_token = seller.get_refresh_token()
+    if not refresh_token:
+        return {"events": [], "error": "No hay Google Calendar vinculado."}
+    
+    try:
+        events = GoogleCalendarService.get_upcoming_events(refresh_token, days_ahead=7)
+        return {"events": events}
+    except Exception as e:
+        print("Error fetching calendar:", e)
+        return {"events": [], "error": "Error al conectar con Google Calendar."}
 
 @app.post("/companies/{company_code}/sellers", status_code=201)
 def preregister_seller(company_code: str, payload: SellerPreRegister, db: Session = Depends(get_db)):
@@ -311,6 +342,88 @@ def update_calendar(email: str, payload: CalendarUpdate, db: Session = Depends(g
     db.commit()
     return {"detail": "Calendario actualizado", "calendar_id": user.calendar_id}
 
+class WebhookPayload(BaseModel):
+    phone: str
+    message: str
+
+@app.post("/api/whatsapp/webhook/asistto")
+def asistto_webhook(payload: WebhookPayload, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """
+    Receives forwarded messages from Asistto. 
+    Asistto must be configured to send a POST request with JSON: {"phone": "+52...", "message": "..."}
+    """
+    user = db.query(User).filter(User.phone_number == payload.phone).first()
+    if not user:
+        # Ignore messages from numbers not registered as salespeople
+        return {"status": "ignored", "reason": "Not a registered salesperson"}
+    
+    if not user.company:
+        return {"status": "error", "reason": "User has no company assigned"}
+    
+    # Get WhatsApp credentials from Company
+    wa_token = user.company.get_whatsapp_token()
+    wa_phone_id = user.company.whatsapp_phone_number_id
+    
+    if not wa_token or not wa_phone_id:
+        logger.warning(f"Company {user.company.name} has no WhatsApp credentials configured.")
+        return {"status": "error", "reason": "No WhatsApp credentials configured"}
+
+    # We process the message in the background to return a fast 200 OK to the Webhook provider
+    background_tasks.add_task(
+        process_incoming_whatsapp_message, 
+        user.id, 
+        payload.phone, 
+        payload.message, 
+        wa_token, 
+        wa_phone_id
+    )
+
+    return {"status": "accepted"}
+
+def process_incoming_whatsapp_message(user_id: int, phone: str, message: str, wa_token: str, wa_phone_id: str):
+    # Need a fresh session for the background task
+    from database.connection import SessionLocal
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            return
+
+        try:
+            refresh_token = user.get_refresh_token()
+        except Exception:
+            refresh_token = ""
+
+        chat_history = redis_memory.get_history(phone)
+        
+        agent = GeminiAgent(
+            user_refresh_token=refresh_token or "",
+            spreadsheet_id=user.spreadsheet_id,
+            template_doc_id=user.template_doc_id,
+            sales_goals=user.sales_goals,
+            objectives=user.objectives,
+            calendar_id=user.calendar_id
+        )
+
+        reply, updated_history = agent.run(chat_history, message)
+
+        redis_memory.add_message(phone, "user", message)
+        redis_memory.add_message(phone, "agent", reply)
+
+        db.add(ConversationLog(phone_number=phone, sender="user", message=message))
+        db.add(ConversationLog(phone_number=phone, sender="agent", message=reply))
+        db.commit()
+
+        # Send the reply back via Meta Cloud API using the company's credentials
+        from services.whatsapp_service import WhatsAppService
+        WhatsAppService.send_text_message(phone, reply, token=wa_token, phone_id=wa_phone_id)
+
+    except Exception as e:
+        logger.error(f"Error processing background WhatsApp message: {e}")
+    finally:
+        db.close()
+
+
 @app.post("/agent/chat")
 def agent_chat(payload: ChatRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.phone_number == payload.phone_number).first()
@@ -356,6 +469,7 @@ def get_seller_profile(email: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     
     return {
+        "id": user.id,
         "name": user.name,
         "phone_number": user.phone_number,
         "role": user.role,

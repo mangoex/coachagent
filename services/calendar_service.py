@@ -57,6 +57,46 @@ class GoogleCalendarService:
         return parsed_events
 
     @classmethod
+    def get_upcoming_events(cls, refresh_token: str, days_ahead: int = 7, calendar_id: str = "primary") -> List[Dict[str, Any]]:
+        """
+        List upcoming events from today until days_ahead.
+        """
+        service = cls._get_calendar_client(refresh_token)
+        
+        target_date = datetime.utcnow().date()
+        end_date = target_date + timedelta(days=days_ahead)
+
+        time_min = f"{target_date.isoformat()}T00:00:00Z"
+        time_max = f"{end_date.isoformat()}T23:59:59Z"
+
+        try:
+            events_result = service.events().list(
+                calendarId=calendar_id,
+                timeMin=time_min,
+                timeMax=time_max,
+                singleEvents=True,
+                orderBy="startTime"
+            ).execute()
+
+            events = events_result.get("items", [])
+            
+            parsed_events = []
+            for event in events:
+                parsed_events.append({
+                    "id": event.get("id"),
+                    "summary": event.get("summary", "Sin Título"),
+                    "description": event.get("description", ""),
+                    "start": event.get("start", {}).get("dateTime") or event.get("start", {}).get("date"),
+                    "end": event.get("end", {}).get("dateTime") or event.get("end", {}).get("date"),
+                    "attendees": [a.get("email") for a in event.get("attendees", []) if a.get("email")],
+                    "status": event.get("status")
+                })
+            return parsed_events
+        except Exception as e:
+            print(f"Error fetching upcoming events: {e}")
+            return []
+
+    @classmethod
     def create_event(
         cls, 
         refresh_token: str, 
