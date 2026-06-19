@@ -1719,6 +1719,7 @@
             btn.disabled = false;
         }
         let chartSalesInstance = null;
+        let coordinatorSellers = [];
 
         async function loadCoordinatorDashboard(companyCode) {
             if (!companyCode) return;
@@ -1727,6 +1728,7 @@
                 if (!res.ok) throw new Error("Error loading dashboard");
                 const data = await res.json();
                 
+                coordinatorSellers = data.sellers || [];
                 document.getElementById('coordinator_global_goals').value = data.global_goals || '';
                 document.getElementById('dashboard_avg_conversion').textContent = data.aggregated.avg_conversion + '%';
                 document.getElementById('dashboard_avg_roi').textContent = data.aggregated.avg_roi + 'x';
@@ -1739,7 +1741,7 @@
                 const salesData = [];
                 const targetsData = [];
 
-                data.sellers.forEach(s => {
+                coordinatorSellers.forEach(s => {
                     labels.push(s.name);
                     salesData.push(s.metrics.sales);
                     targetsData.push(s.metrics.target);
@@ -1755,7 +1757,7 @@
                         <td>${s.metrics.conversion_rate}%</td>
                         <td>${s.metrics.roi}x</td>
                         <td>
-                            <button class="btn btn-outline" style="padding:4px 8px; font-size:12px;" onclick="openEditGoalsModalWithMetrics(${s.id}, '${s.name}', \`${s.sales_goals || ''}\`, '${JSON.stringify(s.metrics)}')">Metas / IA</button>
+                            <button class="btn btn-outline" style="padding:4px 8px; font-size:12px;" onclick="openEditGoalsModal(${s.id})">Metas / IA</button>
                         </td>
                     `;
                     tbody.appendChild(tr);
@@ -1832,11 +1834,13 @@
             btn.innerHTML = 'Guardar Metas Globales';
         }
 
-        function openEditGoalsModalWithMetrics(id, name, goals, metricsJson) {
-            document.getElementById('edit_goal_seller_id').value = id;
-            document.getElementById('edit_goal_seller_name').value = name;
-            document.getElementById('edit_goal_text').value = goals;
-            document.getElementById('edit_goal_metrics').value = metricsJson;
+        function openEditGoalsModal(sellerId) {
+            const seller = coordinatorSellers.find(s => s.id === sellerId);
+            if (!seller) return;
+            document.getElementById('edit_goal_seller_id').value = seller.id;
+            document.getElementById('edit_goal_seller_name').value = seller.name;
+            document.getElementById('edit_goal_text').value = seller.sales_goals || '';
+            document.getElementById('edit_goal_metrics').value = JSON.stringify(seller.metrics || {});
             document.getElementById('modal-edit-goals').classList.remove('hidden');
         }
 
