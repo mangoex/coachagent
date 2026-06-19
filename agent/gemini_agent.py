@@ -104,7 +104,8 @@ class GeminiAgent:
             start_time_iso: str, 
             end_time_iso: str, 
             attendees_csv: str = "", 
-            description: str = ""
+            description: str = "",
+            reminders_json: str = ""
         ) -> str:
             """
             Create a new event in Google Calendar.
@@ -115,11 +116,19 @@ class GeminiAgent:
                 end_time_iso: End date-time in ISO 8601 format (e.g. '2026-06-16T11:00:00Z').
                 attendees_csv: Comma-separated email addresses of attendees.
                 description: Description of the meeting.
+                reminders_json: Optional JSON string to customize notifications/reminders. If empty, the user's default calendar settings are used. Example override structure: '{"useDefault": false, "overrides": [{"method": "popup", "minutes": 15}]}'
             """
             auth_err = _check_auth()
             if auth_err: return auth_err
             try:
                 attendees_list = [a.strip() for a in attendees_csv.split(",")] if attendees_csv else None
+                reminders_dict = None
+                if reminders_json:
+                    try:
+                        reminders_dict = json.loads(reminders_json)
+                    except Exception as je:
+                        logger.warning(f"Failed to parse reminders_json: {str(je)}")
+                
                 event = GoogleCalendarService.create_event(
                     refresh_token=self.refresh_token,
                     summary=summary,
@@ -127,7 +136,8 @@ class GeminiAgent:
                     end_time_iso=end_time_iso,
                     attendees=attendees_list,
                     description=description,
-                    calendar_id=self.calendar_id
+                    calendar_id=self.calendar_id,
+                    reminders=reminders_dict
                 )
                 return f"Event created: {event.get('htmlLink')}"
             except Exception as e:
@@ -140,7 +150,8 @@ class GeminiAgent:
             start_time_iso: str = "", 
             end_time_iso: str = "", 
             attendees_csv: str = "", 
-            description: str = ""
+            description: str = "",
+            reminders_json: str = ""
         ) -> str:
             """
             Update an existing calendar event.
@@ -152,13 +163,29 @@ class GeminiAgent:
                 end_time_iso: New end date-time in ISO 8601 format.
                 attendees_csv: Comma-separated list of attendee emails.
                 description: New description.
+                reminders_json: Optional JSON string to customize notifications/reminders. If empty, reminders are not modified. Example structure: '{"useDefault": false, "overrides": [{"method": "popup", "minutes": 15}]}'
             """
             auth_err = _check_auth()
             if auth_err: return auth_err
             try:
                 attendees_list = [a.strip() for a in attendees_csv.split(",")] if attendees_csv else None
+                reminders_dict = None
+                if reminders_json:
+                    try:
+                        reminders_dict = json.loads(reminders_json)
+                    except Exception as je:
+                        logger.warning(f"Failed to parse reminders_json: {str(je)}")
+
                 event = GoogleCalendarService.update_event(
-                    self.refresh_token, event_id, summary or None, start_time_iso or None, end_time_iso or None, attendees_list, description or None, self.calendar_id
+                    refresh_token=self.refresh_token,
+                    event_id=event_id,
+                    summary=summary or None,
+                    start_time_iso=start_time_iso or None,
+                    end_time_iso=end_time_iso or None,
+                    attendees=attendees_list,
+                    description=description or None,
+                    calendar_id=self.calendar_id,
+                    reminders=reminders_dict
                 )
                 return json.dumps(event, ensure_ascii=False)
             except Exception as e:

@@ -105,7 +105,8 @@ class GoogleCalendarService:
         end_time_iso: str, 
         attendees: Optional[List[str]] = None,
         description: Optional[str] = None,
-        calendar_id: str = "primary"
+        calendar_id: str = "primary",
+        reminders: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         Create a new event in Google Calendar.
@@ -123,6 +124,11 @@ class GoogleCalendarService:
         
         if attendees:
             event_body["attendees"] = [{"email": email} for email in attendees]
+
+        if reminders is not None:
+            event_body["reminders"] = reminders
+        else:
+            event_body["reminders"] = {"useDefault": True}
 
         created_event = service.events().insert(
             calendarId=calendar_id,
@@ -148,7 +154,8 @@ class GoogleCalendarService:
         end_time_iso: Optional[str] = None,
         attendees: Optional[List[str]] = None,
         description: Optional[str] = None,
-        calendar_id: str = "primary"
+        calendar_id: str = "primary",
+        reminders: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         Update an existing event.
@@ -168,6 +175,8 @@ class GoogleCalendarService:
             event["end"] = {"dateTime": end_time_iso}
         if attendees is not None:
             event["attendees"] = [{"email": email} for email in attendees]
+        if reminders is not None:
+            event["reminders"] = reminders
 
         updated_event = service.events().update(
             calendarId=calendar_id,
