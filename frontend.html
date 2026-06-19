@@ -8,6 +8,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
     <!-- Phosphor Icons (Modern & Clean) -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <!-- Firebase SDK (Modular) -->
     <script type="module">
@@ -573,7 +575,10 @@
                     <i class="ph ph-buildings"></i> Empresa
                 </a>
                 <a class="nav-item" onclick="showAppView('team')" id="nav-team" style="display:none;">
-                    <i class="ph ph-users-three"></i> Mi Equipo
+                    <i class="ph ph-users-three"></i><span>Mi Equipo</span>
+                </a>
+                <a class="nav-item" onclick="showAppView('coordinator')" id="nav-coordinator" style="display:none;">
+                    <i class="ph ph-chart-bar"></i><span>Panel Coordinador</span>
                 </a>
             </nav>
             <div class="sidebar-footer">
@@ -815,6 +820,69 @@
                 </div>
             </div>
 
+            <!-- VIEW: COORDINATOR -->
+            <div id="view-coordinator" class="view-panel">
+                <div class="page-header">
+                    <div>
+                        <h2>Panel Coordinador</h2>
+                        <p>Tablero gráfico y metas globales de la empresa</p>
+                    </div>
+                    <div style="display:flex; gap:10px;">
+                        <button class="btn btn-outline" onclick="loadCoordinatorDashboard(currentUser.company_code)"><i class="ph ph-arrows-clockwise"></i> Refrescar</button>
+                    </div>
+                </div>
+
+                <div class="card" style="margin-bottom: 20px;">
+                    <h3>Metas Globales de la Empresa</h3>
+                    <p style="color:var(--text-muted); font-size:14px; margin-bottom:10px;">Define la estrategia general. La IA usará esto para asignar metas a los vendedores.</p>
+                    <textarea id="coordinator_global_goals" class="input" style="height: 80px; resize:vertical; background: rgba(0,0,0,0.2);" placeholder="Ej. Aumentar ventas un 20% este Q3, mejorar tasa de conversión al 30%..."></textarea>
+                    <button class="btn" style="margin-top:10px;" onclick="saveGlobalGoals()">Guardar Metas Globales</button>
+                </div>
+
+                <div style="display:grid; grid-template-columns: 2fr 1fr; gap:20px; margin-bottom: 20px;">
+                    <div class="card">
+                        <h3>Ventas vs Meta por Vendedor</h3>
+                        <canvas id="chartSales" style="max-height: 300px; width:100%;"></canvas>
+                    </div>
+                    <div class="card">
+                        <h3>Promedios Globales</h3>
+                        <div style="margin-top: 20px; text-align: center;">
+                            <div style="font-size: 36px; font-weight:bold; color:var(--primary);" id="dashboard_avg_conversion">--%</div>
+                            <div style="color:var(--text-muted); font-size:14px;">Tasa de Conversión Promedio</div>
+                        </div>
+                        <div style="margin-top: 20px; text-align: center;">
+                            <div style="font-size: 36px; font-weight:bold; color:var(--secondary);" id="dashboard_avg_roi">--x</div>
+                            <div style="color:var(--text-muted); font-size:14px;">ROI Promedio</div>
+                        </div>
+                        <div style="margin-top: 20px; text-align: center;">
+                            <div style="font-size: 24px; font-weight:bold; color:var(--text-main);" id="dashboard_total_sales">$0</div>
+                            <div style="color:var(--text-muted); font-size:14px;">Ventas Totales Proyectadas</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Detalle de Rendimiento (Mocks Simulados)</h3>
+                    <div class="table-container">
+                        <table class="data-table" id="dashboard-sellers-table">
+                            <thead>
+                                <tr>
+                                    <th>Vendedor</th>
+                                    <th>Ventas</th>
+                                    <th>Meta</th>
+                                    <th>Conversión</th>
+                                    <th>ROI</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Llenado dinámicamente -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
             <!-- VIEW: TEAM -->
             <div id="view-team" class="view-panel">
                 <div class="page-header">
@@ -890,10 +958,15 @@
                 <input type="text" id="edit_goal_seller_name" readonly style="opacity:0.7">
             </div>
             <div class="form-group">
-                <label>Nuevas Metas</label>
-                <textarea id="edit_goal_text" rows="4" placeholder="Establece las metas que el sistema usará para crear sus planes semanales..."></textarea>
+                <label style="display:flex; justify-content:space-between; align-items:center;">
+                    <span>Nuevas Metas</span>
+                    <button class="btn-outline" style="font-size: 12px; padding: 4px 8px;" onclick="suggestAIGoals()" id="btn-suggest-ai">✨ Sugerir IA</button>
+                </label>
+                <textarea class="input" id="edit_goal_text" rows="5" style="resize:vertical;" placeholder="Establece las metas que el sistema usará para crear sus planes semanales..."></textarea>
+                <div id="ai-suggestion-loader" class="hidden" style="font-size: 12px; color: var(--primary); margin-top: 5px;"><i class="ph ph-spinner ph-spin"></i> La IA está analizando el rendimiento y las metas globales...</div>
             </div>
             <input type="hidden" id="edit_goal_seller_id">
+            <input type="hidden" id="edit_goal_metrics">
             <button class="btn" style="width:100%; margin-top:10px;" onclick="saveSellerGoals()">Guardar Metas</button>
         </div>
     </div>
@@ -1093,9 +1166,13 @@
                         document.getElementById('nav-company').style.display = 'flex';
                         if (data.role === 'admin' || data.role === 'admin_empresa') {
                             document.getElementById('nav-team').style.display = 'flex';
+                            document.getElementById('nav-coordinator').style.display = 'flex';
                         }
                         if (data.company_code) {
                             loadCompanyData(data.company_code);
+                            if (data.role === 'admin' || data.role === 'admin_empresa') {
+                                loadCoordinatorDashboard(data.company_code);
+                            }
                         }
                     }
 
@@ -1623,7 +1700,160 @@
             btn.innerHTML = 'Guardar Metas';
             btn.disabled = false;
         }
+        let chartSalesInstance = null;
 
+        async function loadCoordinatorDashboard(companyCode) {
+            if (!companyCode) return;
+            try {
+                const res = await fetch(`/companies/${companyCode}/dashboard`);
+                if (!res.ok) throw new Error("Error loading dashboard");
+                const data = await res.json();
+                
+                document.getElementById('coordinator_global_goals').value = data.global_goals || '';
+                document.getElementById('dashboard_avg_conversion').textContent = data.aggregated.avg_conversion + '%';
+                document.getElementById('dashboard_avg_roi').textContent = data.aggregated.avg_roi + 'x';
+                document.getElementById('dashboard_total_sales').textContent = '$' + data.aggregated.total_sales.toLocaleString();
+                
+                const tbody = document.querySelector('#dashboard-sellers-table tbody');
+                tbody.innerHTML = '';
+                
+                const labels = [];
+                const salesData = [];
+                const targetsData = [];
+
+                data.sellers.forEach(s => {
+                    labels.push(s.name);
+                    salesData.push(s.metrics.sales);
+                    targetsData.push(s.metrics.target);
+                    
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>
+                            <div style="font-weight:600;">${s.name}</div>
+                            <div style="font-size:11px; color:var(--text-muted);">${s.role}</div>
+                        </td>
+                        <td style="color:var(--text-main); font-weight:500;">$${s.metrics.sales.toLocaleString()}</td>
+                        <td style="color:var(--text-muted);">$${s.metrics.target.toLocaleString()}</td>
+                        <td>${s.metrics.conversion_rate}%</td>
+                        <td>${s.metrics.roi}x</td>
+                        <td>
+                            <button class="btn btn-outline" style="padding:4px 8px; font-size:12px;" onclick="openEditGoalsModalWithMetrics(${s.id}, '${s.name}', \`${s.sales_goals || ''}\`, '${JSON.stringify(s.metrics)}')">Metas / IA</button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+                // Render Chart
+                if (chartSalesInstance) chartSalesInstance.destroy();
+                const ctx = document.getElementById('chartSales').getContext('2d');
+                chartSalesInstance = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'Ventas Logradas',
+                                data: salesData,
+                                backgroundColor: 'rgba(124, 77, 255, 0.8)',
+                                borderRadius: 4
+                            },
+                            {
+                                label: 'Meta Asignada',
+                                data: targetsData,
+                                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                                borderRadius: 4
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                labels: { color: '#e0e0e0', font: { family: 'Outfit' } }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                grid: { color: 'rgba(255,255,255,0.05)' },
+                                ticks: { color: '#aaa', font: { family: 'Outfit' } }
+                            },
+                            x: {
+                                grid: { display: false },
+                                ticks: { color: '#aaa', font: { family: 'Outfit' } }
+                            }
+                        }
+                    }
+                });
+
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function saveGlobalGoals() {
+            if (!currentUser || !currentUser.company_code) return;
+            const btn = document.querySelector('#coordinator_global_goals').nextElementSibling;
+            btn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Guardando...';
+            const goals = document.getElementById('coordinator_global_goals').value;
+            
+            try {
+                const res = await fetch(`/companies/${currentUser.company_code}/global-goals`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ global_goals: goals })
+                });
+                if (res.ok) {
+                    alert("Metas globales guardadas exitosamente.");
+                } else {
+                    alert("Error al guardar metas globales.");
+                }
+            } catch (e) {
+                console.error(e);
+            }
+            btn.innerHTML = 'Guardar Metas Globales';
+        }
+
+        function openEditGoalsModalWithMetrics(id, name, goals, metricsJson) {
+            document.getElementById('edit_goal_seller_id').value = id;
+            document.getElementById('edit_goal_seller_name').value = name;
+            document.getElementById('edit_goal_text').value = goals;
+            document.getElementById('edit_goal_metrics').value = metricsJson;
+            document.getElementById('modal-edit-goals').classList.remove('hidden');
+        }
+
+        async function suggestAIGoals() {
+            const btn = document.getElementById('btn-suggest-ai');
+            const loader = document.getElementById('ai-suggestion-loader');
+            const textArea = document.getElementById('edit_goal_text');
+            const metricsJson = document.getElementById('edit_goal_metrics').value;
+            const sellerId = document.getElementById('edit_goal_seller_id').value;
+
+            if (!currentUser || !currentUser.company_code) return;
+
+            btn.disabled = true;
+            loader.classList.remove('hidden');
+
+            try {
+                const res = await fetch(`/companies/${currentUser.company_code}/sellers/${sellerId}/ai-goals`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ metrics: JSON.parse(metricsJson) })
+                });
+                const data = await res.json();
+                if (data.suggested_goals) {
+                    textArea.value = data.suggested_goals;
+                } else {
+                    alert("Error generando propuesta");
+                }
+            } catch (e) {
+                console.error(e);
+                alert("Error de conexión al sugerir metas");
+            }
+
+            loader.classList.add('hidden');
+            btn.disabled = false;
+        }
     </script>
 </body>
 </html>

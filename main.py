@@ -66,7 +66,8 @@ def startup_event():
                 "ALTER TABLE users ADD COLUMN objectives TEXT;",
                 "ALTER TABLE users ADD COLUMN calendar_id VARCHAR DEFAULT 'primary';",
                 "ALTER TABLE companies ADD COLUMN whatsapp_phone_number_id VARCHAR;",
-                "ALTER TABLE companies ADD COLUMN encrypted_whatsapp_token VARCHAR;"
+                "ALTER TABLE companies ADD COLUMN encrypted_whatsapp_token VARCHAR;",
+                "ALTER TABLE companies ADD COLUMN global_goals TEXT;"
             ]
             for query in migrations:
                 try:
@@ -91,6 +92,12 @@ class CompanyCreate(BaseModel):
 class CompanyUpdate(BaseModel):
     whatsapp_phone_number_id: Optional[str] = None
     whatsapp_token: Optional[str] = None
+
+class GlobalGoalsUpdate(BaseModel):
+    global_goals: str
+
+class AIGoalProposalRequest(BaseModel):
+    metrics: dict
 
 class SellerPreRegister(BaseModel):
     name: str
@@ -203,6 +210,105 @@ def list_company_sellers(company_code: str, db: Session = Depends(get_db)):
             "objectives": s.objectives
         } for s in sellers
     ]
+
+@app.put("/companies/{company_code}/global-goals")
+def update_global_goals(company_code: str, payload: GlobalGoalsUpdate, db: Session = Depends(get_db)):
+    company = db.query(Company).filter(Company.company_code == company_code).first()
+    if not company:
+        raise HTTPException(status_code=404, detail="Empresa no encontrada")
+    
+    company.global_goals = payload.global_goals
+    db.commit()
+    return {"status": "ok", "global_goals": company.global_goals}
+
+@app.get("/companies/{company_code}/dashboard")
+def get_dashboard_metrics(company_code: str, db: Session = Depends(get_db)):
+    company = db.query(Company).filter(Company.company_code == company_code).first()
+    if not company:
+        raise HTTPException(status_code=404, detail="Empresa no encontrada")
+    
+    sellers = db.query(User).filter(User.company_id == company.id).all()
+    
+    # Mock data generation based on sellers for MVP visualization
+    # Real data would come from reading CRM Sheets
+    import random
+    
+    metrics_list = []
+    total_sales = 0
+    total_target = 0
+    
+    for s in sellers:
+        # Generate stable mock data using user ID as seed
+        random.seed(s.id + 100) 
+        target = random.randint(10000, 50000)
+        sales = int(target * random.uniform(0.4, 1.1))
+        conv_rate = round(random.uniform(15, 45), 1)
+        roi = round(random.uniform(1.2, 3.5), 1)
+        clients = random.randint(20, 150)
+        
+        metrics_list.append({
+            "id": s.id,
+            "name": s.name,
+            "role": s.role,
+            "sales_goals": s.sales_goals,
+            "metrics": {
+                "sales": sales,
+                "target": target,
+                "conversion_rate": conv_rate,
+                "roi": roi,
+                "clients": clients
+            }
+        })
+        
+        total_sales += sales
+        total_target += target
+        
+    return {
+        "global_goals": company.global_goals,
+        "company_name": company.name,
+        "aggregated": {
+            "total_sales": total_sales,
+            "total_target": total_target,
+            "avg_conversion": round(sum([m["metrics"]["conversion_rate"] for m in metrics_list]) / len(metrics_list), 1) if metrics_list else 0,
+            "avg_roi": round(sum([m["metrics"]["roi"] for m in metrics_list]) / len(metrics_list), 1) if metrics_list else 0
+        },
+        "sellers": metrics_list
+    }
+
+@app.post("/companies/{company_code}/sellers/{seller_id}/ai-goals")
+def suggest_ai_goals(company_code: str, seller_id: int, payload: AIGoalProposalRequest, db: Session = Depends(get_db)):
+    company = db.query(Company).filter(Company.company_code == company_code).first()
+    if not company:
+        raise HTTPException(status_code=404, detail="Empresa no encontrada")
+        
+    seller = db.query(User).filter(User.id == seller_id, User.company_id == company.id).first()
+    if not seller:
+        raise HTTPException(status_code=404, detail="Vendedor no encontrado en esta empresa")
+        
+    try:
+        from agent.gemini_agent import GenerativeModel
+        model = GenerativeModel(model_name="gemini-2.5-pro")
+        
+        prompt = f"""
+        Eres un analista de ventas experto. La empresa '{company.name}' tiene las siguientes Metas Globales:
+        {company.global_goals or 'No definidas explícitamente, asume maximizar ingresos y retención.'}
+        
+        El vendedor '{seller.name}' tiene este rendimiento actual:
+        - Ventas Logradas: ${payload.metrics.get('sales', 0)}
+        - Clientes Atendidos: {payload.metrics.get('clients', 0)}
+        - Tasa de Conversión: {payload.metrics.get('conversion_rate', 0)}%
+        - ROI: {payload.metrics.get('roi', 0)}x
+        
+        Genera una propuesta de "Metas de Venta" personalizadas para este vendedor (máximo 3 párrafos cortos).
+        Deben ser accionables, alineadas a las metas globales de la empresa, pero considerando su rendimiento actual.
+        No uses saludos ni introducciones, responde directamente con las metas.
+        """
+        
+        response = model.generate_content(prompt)
+        return {"suggested_goals": response.text.strip()}
+    except Exception as e:
+        logger.error(f"Error calling AI: {e}")
+        return {"suggested_goals": f"Error al generar propuesta con IA. Revisa las configuraciones de Vertex AI. Detalle: {str(e)}"}
 
 @app.put("/seller/{user_id}/goals")
 def update_seller_goals(user_id: int, payload: SellerUpdate, db: Session = Depends(get_db)):

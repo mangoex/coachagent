@@ -12,6 +12,7 @@ class Company(Base):
     company_code = Column(String, unique=True, index=True, nullable=False)
     whatsapp_phone_number_id = Column(String, nullable=True)
     encrypted_whatsapp_token = Column(String, nullable=True)
+    global_goals = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     users = relationship("User", back_populates="company")
