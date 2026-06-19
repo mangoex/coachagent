@@ -287,6 +287,12 @@ class CompanyAdminCreate(BaseModel):
 
 @app.post("/auth/seller/company-admin")
 def register_company_admin(payload: CompanyAdminCreate, db: Session = Depends(get_db)):
+    # Check if phone or email already exists
+    if db.query(User).filter(User.phone_number == payload.phone_number).first():
+        raise HTTPException(status_code=400, detail="Este número de teléfono ya está registrado con otra cuenta.")
+    if db.query(User).filter(User.email == payload.email).first():
+        raise HTTPException(status_code=400, detail="Este correo ya está registrado en nuestra base de datos.")
+
     # Create Company
     code = f"{payload.company_name[:3].upper()}-{str(uuid.uuid4())[:6].upper()}"
     new_company = Company(name=payload.company_name, company_code=code)
