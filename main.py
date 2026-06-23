@@ -78,6 +78,16 @@ def startup_event():
                 except Exception as e:
                     conn.rollback()
                     logger.info(f"Migration skipped (likely exists): {e}")
+            
+            # Reset mangoex@gmail.com role to independent
+            try:
+                conn.execute(text("UPDATE users SET role = 'vendedor_independiente', company_id = NULL WHERE email = 'mangoex@gmail.com';"))
+                conn.commit()
+                logger.info("Successfully reset mangoex@gmail.com role to vendedor_independiente")
+            except Exception as e:
+                conn.rollback()
+                logger.error(f"Failed to reset mangoex@gmail.com role: {e}")
+
         logger.info("Database tables initialized successfully.")
     except Exception as e:
         logger.critical(f"Failed to initialize database tables: {str(e)}")
