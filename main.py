@@ -874,7 +874,7 @@ def get_upcoming_events(user_id: int, db: Session = Depends(get_db)):
         return {"events": [], "error": "No hay Google Calendar vinculado."}
     
     try:
-        events = GoogleCalendarService.get_upcoming_events(refresh_token, days_ahead=7)
+        events = GoogleCalendarService.get_upcoming_events(refresh_token, days_ahead=7, calendar_id=seller.calendar_id)
         return {"events": events}
     except Exception as e:
         print("Error fetching calendar:", e)
