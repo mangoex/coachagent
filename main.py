@@ -13,10 +13,10 @@ from firebase_admin import credentials, auth as firebase_auth
 from google_auth_oauthlib.flow import Flow
 
 from database.connection import Base, engine, get_db
-from database.models import User, ConversationLog, Company, AccountabilityPlan, DailyActivityLog, CalendarEventAudit
+from database.models import User, ConversationLog, Company, AccountabilityPlan, DailyActivityLog, CalendarEventAudit, SlightEdgePlan, SlightEdgeLog
 from agent.redis_memory import redis_memory
 from agent.gemini_agent import GeminiAgent
-from routers import whatsapp, cron, audit
+from routers import whatsapp, cron, audit, slight_edge
 from config.settings import settings
 from services.calendar_service import GoogleCalendarService
 
@@ -85,6 +85,7 @@ def startup_event():
 app.include_router(whatsapp.router)
 app.include_router(cron.router)
 app.include_router(audit.router)
+app.include_router(slight_edge.router)
 
 # Pydantic schemas
 class CompanyCreate(BaseModel):

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, JSON, Date, Boolean, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, JSON, Date, Boolean, UniqueConstraint, Float
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from database.connection import Base
@@ -63,6 +63,8 @@ class User(Base):
     accountability_plan = relationship("AccountabilityPlan", back_populates="user", uselist=False, cascade="all, delete-orphan")
     daily_logs = relationship("DailyActivityLog", back_populates="user", cascade="all, delete-orphan")
     calendar_audits = relationship("CalendarEventAudit", back_populates="user", cascade="all, delete-orphan")
+    slight_edge_plan = relationship("SlightEdgePlan", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    slight_edge_logs = relationship("SlightEdgeLog", back_populates="user", cascade="all, delete-orphan")
 
     def set_refresh_token(self, raw_token: str):
         """Encrypts and stores the Google OAuth 2.0 refresh token."""
@@ -169,4 +171,44 @@ class CalendarEventAudit(Base):
 
     __table_args__ = (
         UniqueConstraint('user_id', 'event_id', name='uix_user_event'),
+    )
+
+
+class SlightEdgePlan(Base):
+    __tablename__ = "slight_edge_plans"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), unique=True, index=True, nullable=False)
+    
+    monthly_income_goal = Column(Float, default=0.0)
+    ticket_average = Column(Float, default=0.0)
+    conversion_rate = Column(Float, default=0.0)
+    funnel_metrics = Column(JSON, nullable=True)
+    
+    activities_config = Column(JSON, nullable=False, default=list)
+    daily_points_goal = Column(Integer, default=10)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
+
+    user = relationship("User", back_populates="slight_edge_plan")
+
+
+class SlightEdgeLog(Base):
+    __tablename__ = "slight_edge_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    date = Column(Date, nullable=False)
+    
+    completed_activities = Column(JSON, nullable=False, default=dict)
+    total_points = Column(Integer, default=0)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
+
+    user = relationship("User", back_populates="slight_edge_logs")
+
+    __table_args__ = (
+        UniqueConstraint('user_id', 'date', name='uix_user_slight_edge_date'),
     )

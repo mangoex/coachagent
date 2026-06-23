@@ -568,6 +568,9 @@
                 <a class="nav-item" onclick="showAppView('playground')" id="nav-playground">
                     <i class="ph ph-chat-teardrop-text"></i> Playground
                 </a>
+                <a class="nav-item" onclick="showAppView('advantage')" id="nav-advantage">
+                    <i class="ph ph-trend-up"></i> La Ventaja
+                </a>
                 <a class="nav-item" onclick="showAppView('accountability')" id="nav-accountability" style="display:none;">
                     <i class="ph ph-check-square"></i> Actividades y Metas
                 </a>
@@ -1164,6 +1167,155 @@
 
             </div>
 
+            <!-- VIEW: ADVANTAGE (LA VENTAJA) -->
+            <div id="view-advantage" class="view-panel">
+                <div class="page-header">
+                    <div>
+                        <h2>La Ventaja (The Slight Edge)</h2>
+                        <p>Aplica disciplinas diarias consistentes para lograr un crecimiento exponencial a través del Efecto Compuesto.</p>
+                    </div>
+                </div>
+
+                <!-- STATE 1: NO PLAN YET -->
+                <div id="advantage-no-plan" class="card glass" style="max-width: 800px; padding: 30px; text-align: center; margin: 40px auto;">
+                    <div style="font-size: 60px; color: var(--primary); margin-bottom: 20px;">
+                        <i class="ph ph-trend-up"></i>
+                    </div>
+                    <h3 style="font-size: 24px; margin-bottom: 15px; font-family: 'Outfit';">El poder de las pequeñas disciplinas cotidianas</h3>
+                    <p style="color: var(--text-muted); line-height: 1.6; max-width: 600px; margin: 0 auto 25px auto;">
+                        El éxito no ocurre de la noche a la mañana. Se construye mediante pequeñas decisiones correctas repetidas consistentemente a lo largo del tiempo. 
+                        Inicia tu sesión estructurada de coaching con nuestra IA para calcular tu embudo de ventas actual y diseñar tu checklist de hábitos diarios.
+                    </p>
+                    <button class="btn" onclick="startAdvantageCoaching()" style="background: linear-gradient(135deg, #6366f1, #a855f7); border: none; padding: 12px 24px;">
+                        <i class="ph ph-sparkle"></i> Iniciar Sesión de Coaching
+                    </button>
+                </div>
+
+                <!-- STATE 2: COACHING CHAT -->
+                <div id="advantage-coaching" class="card glass hidden" style="max-width: 800px; height: 600px; display: flex; flex-direction: column; margin: 20px auto;">
+                    <div class="card-header" style="justify-content: space-between;">
+                        <div class="card-title" style="display:flex; align-items:center; gap:8px;">
+                            <i class="ph ph-sparkle" style="color:var(--primary);"></i> Coach de Ventas - La Ventaja
+                        </div>
+                        <button class="btn btn-outline btn-sm" onclick="cancelAdvantageCoaching()">Salir</button>
+                    </div>
+                    <div id="advantage-chat-messages" style="flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px;">
+                        <!-- Chat history goes here -->
+                    </div>
+                    <div style="padding: 15px; border-top: 1px solid rgba(255,255,255,0.05); display: flex; gap: 10px; background: rgba(0,0,0,0.2);">
+                        <input type="text" id="advantage-chat-input" placeholder="Escribe tu respuesta..." style="flex: 1; padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); color: white;" onkeydown="if(event.key==='Enter') sendAdvantageChatMessage()">
+                        <button class="btn" onclick="sendAdvantageChatMessage()"><i class="ph ph-paper-plane-tilt"></i> Enviar</button>
+                    </div>
+                </div>
+
+                <!-- STATE 3: ACTIVE TRACKER -->
+                <div id="advantage-tracker" class="hidden">
+                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 20px;">
+                        
+                        <!-- Progress Card -->
+                        <div class="card glass" style="display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 30px; text-align: center;">
+                            <h4 style="color:var(--text-muted); font-size:14px; margin-bottom: 15px;">PROGRESO DIARIO DE HOY</h4>
+                            
+                            <!-- Circular Progress Bar -->
+                            <div style="position: relative; width: 150px; height: 150px; display: flex; align-items: center; justify-content: center; margin-bottom: 15px;">
+                                <svg style="width: 150px; height: 150px; transform: rotate(-90deg);">
+                                    <circle cx="75" cy="75" r="60" stroke="rgba(255,255,255,0.05)" stroke-width="12" fill="transparent"></circle>
+                                    <circle id="advantage-progress-circle" cx="75" cy="75" r="60" stroke="url(#gradient-primary)" stroke-width="12" fill="transparent" stroke-dasharray="377" stroke-dashoffset="377" style="transition: stroke-dashoffset 0.5s ease;"></circle>
+                                    <defs>
+                                        <linearGradient id="gradient-primary" x1="0%" y1="0%" x2="100%" y2="100%">
+                                            <stop offset="0%" stop-color="#6366f1"></stop>
+                                            <stop offset="100%" stop-color="#a855f7"></stop>
+                                        </linearGradient>
+                                    </defs>
+                                </svg>
+                                <div style="position: absolute; display: flex; flex-direction: column; align-items: center;">
+                                    <span id="advantage-points-text" style="font-size: 32px; font-weight: bold; font-family: 'Outfit';">0</span>
+                                    <span style="font-size: 12px; color: var(--text-muted);">de <span id="advantage-points-goal">10</span> pts</span>
+                                </div>
+                            </div>
+                            <p style="font-size: 13px; color:var(--text-muted);" id="advantage-weekend-msg">Meta aplicable solo en días hábiles (Lunes a Viernes)</p>
+                        </div>
+
+                        <!-- Funnel Config Card -->
+                        <div class="card glass" style="padding: 20px;">
+                            <div class="card-header">
+                                <div class="card-title"><i class="ph ph-funnel" style="color:var(--accent);"></i> Tu Embudo de Ventas Estimado</div>
+                            </div>
+                            <div style="padding: 10px; display:flex; flex-direction:column; gap:12px;" id="advantage-funnel-container">
+                                <!-- Funnel figures -->
+                            </div>
+                            <div style="margin-top: 15px; border-top:1px solid rgba(255,255,255,0.05); padding-top:12px; display:flex; justify-content:space-between;">
+                                <button class="btn btn-outline btn-sm" onclick="startAdvantageCoaching()"><i class="ph ph-sparkle"></i> Ajustar con Coach</button>
+                                <button class="btn btn-outline btn-sm" onclick="editAdvantagePlanManually()"><i class="ph ph-sliders"></i> Ajustar Pesos</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+                        
+                        <!-- Daily checklist -->
+                        <div class="card glass" style="padding: 20px;">
+                            <div class="card-header" style="justify-content: space-between;">
+                                <div class="card-title"><i class="ph ph-check-square" style="color:var(--success);"></i> Checklist de Disciplinas Diarias</div>
+                                <button class="btn btn-outline btn-sm" onclick="showAddActivityModal()"><i class="ph ph-plus"></i> Nueva Tarea</button>
+                            </div>
+                            <div id="advantage-checklist-container" style="display:flex; flex-direction:column; gap:12px; padding: 10px 0;">
+                                <!-- checklist items -->
+                            </div>
+                        </div>
+
+                        <!-- Graph consistency card -->
+                        <div class="card glass" style="padding: 20px;">
+                            <div class="card-header">
+                                <div class="card-title"><i class="ph ph-chart-line-up" style="color:var(--primary);"></i> Consistencia Acumulada (Efecto Compuesto)</div>
+                            </div>
+                            <div style="padding:10px; height: 250px; position:relative;">
+                                <canvas id="chartSlightEdgeHistory"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MODAL: ADD / EDIT ACTIVITY -->
+            <div id="modal-advantage-activity" class="hidden" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:9999; display:flex; align-items:center; justify-content:center;">
+                <div class="card glass" style="width:90%; max-width:400px; padding: 25px;">
+                    <div class="card-header" style="margin-bottom: 20px;">
+                        <div class="card-title" id="advantage-modal-title">Agregar Disciplina</div>
+                        <button class="btn-outline" style="border:none; color:white;" onclick="closeActivityModal()"><i class="ph ph-x"></i></button>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label>Nombre de la Actividad</label>
+                        <input type="text" id="advantage-act-name" placeholder="Ej. Prospectar en LinkedIn">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 20px;">
+                        <label>Puntos / Peso (por cada repetición)</label>
+                        <input type="number" id="advantage-act-points" min="1" max="10" value="1">
+                    </div>
+                    <div style="display:flex; gap:10px; justify-content:flex-end;">
+                        <button class="btn btn-outline" onclick="closeActivityModal()">Cancelar</button>
+                        <button class="btn" id="btn-save-advantage-activity" onclick="saveAdvantageActivity()">Guardar</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MODAL: EDIT PLAN MANUAL -->
+            <div id="modal-advantage-plan-manual" class="hidden" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:9999; display:flex; align-items:center; justify-content:center;">
+                <div class="card glass" style="width:90%; max-width:500px; padding: 25px;">
+                    <div class="card-header" style="margin-bottom: 20px;">
+                        <div class="card-title">Ajustar Pesos y Actividades</div>
+                        <button class="btn-outline" style="border:none; color:white;" onclick="closePlanManualModal()"><i class="ph ph-x"></i></button>
+                    </div>
+                    <div style="max-height: 300px; overflow-y: auto; display:flex; flex-direction:column; gap:12px; margin-bottom: 20px;" id="advantage-manual-list">
+                        <!-- Manual list of activities to edit points or delete -->
+                    </div>
+                    <div style="display:flex; gap:10px; justify-content:flex-end;">
+                        <button class="btn btn-outline" onclick="closePlanManualModal()">Cancelar</button>
+                        <button class="btn" onclick="saveAdvantagePlanManual()">Guardar Cambios</button>
+                    </div>
+                </div>
+            </div>
+
         </main>
         </div>
     </div>
@@ -1358,6 +1510,8 @@
                 loadTeamData();
             } else if (view === 'accountability') {
                 loadAccountabilityData();
+            } else if (view === 'advantage') {
+                loadAdvantageData();
             }
         }
 
@@ -2628,6 +2782,492 @@
                 }
             } catch (e) {
                 console.error("Error marking meeting completed:", e);
+            }
+        }
+
+        // --- LA VENTAJA (SLIGHT EDGE) SECTION LOGIC ---
+        let advantageCoachingHistory = [];
+        let advantagePlan = null;
+        let advantageTodayLog = null;
+        let chartSlightEdgeInstance = null;
+
+        function getTodayIso() {
+            const d = new Date();
+            const offset = d.getTimezoneOffset();
+            const localDate = new Date(d.getTime() - (offset*60*1000));
+            return localDate.toISOString().split('T')[0];
+        }
+
+        async function loadAdvantageData() {
+            if (!window.sellerData || !window.sellerData.id) return;
+            const userId = window.sellerData.id;
+
+            try {
+                // Fetch Plan
+                const resPlan = await fetch(`/api/slight-edge/plan/${userId}`);
+                if (resPlan.status === 404) {
+                    // No plan exists yet
+                    document.getElementById('advantage-no-plan').classList.remove('hidden');
+                    document.getElementById('advantage-coaching').classList.add('hidden');
+                    document.getElementById('advantage-tracker').classList.add('hidden');
+                    return;
+                } else if (!resPlan.ok) {
+                    throw new Error("Failed to load Slight Edge plan");
+                }
+
+                advantagePlan = await resPlan.json();
+                
+                // Show tracker, hide others
+                document.getElementById('advantage-no-plan').classList.add('hidden');
+                document.getElementById('advantage-coaching').classList.add('hidden');
+                document.getElementById('advantage-tracker').classList.remove('hidden');
+
+                // Render Funnel
+                renderFunnelMetrics(advantagePlan.funnel_metrics, advantagePlan.monthly_income_goal, advantagePlan.ticket_average, advantagePlan.conversion_rate);
+
+                // Fetch Today's Log
+                const todayStr = getTodayIso();
+                const resLog = await fetch(`/api/slight-edge/log/${userId}?date_str=${todayStr}`);
+                if (resLog.ok) {
+                    advantageTodayLog = await resLog.json();
+                } else {
+                    advantageTodayLog = { date: todayStr, completed_activities: {}, total_points: 0 };
+                }
+
+                // Render Progress and Checklist
+                updateAdvantageProgress();
+                renderAdvantageChecklist();
+
+                // Render Chart History
+                await loadSlightEdgeChartHistory(userId);
+
+            } catch (err) {
+                console.error("Error loading advantage data:", err);
+            }
+        }
+
+        function updateAdvantageProgress() {
+            if (!advantagePlan || !advantageTodayLog) return;
+            const points = advantageTodayLog.total_points || 0;
+            const goal = advantagePlan.daily_points_goal || 10;
+            
+            document.getElementById('advantage-points-text').innerText = points;
+            document.getElementById('advantage-points-goal').innerText = goal;
+
+            // Update SVG circle offset
+            // stroke-dasharray = 377 (circumference of r=60)
+            const circle = document.getElementById('advantage-progress-circle');
+            if (circle) {
+                const pct = Math.min(points / goal, 1.0);
+                const offset = 377 - (377 * pct);
+                circle.style.strokeDashoffset = offset;
+            }
+        }
+
+        function renderFunnelMetrics(metrics, goal, ticket, convRate) {
+            const container = document.getElementById('advantage-funnel-container');
+            container.innerHTML = '';
+            
+            let html = `
+                <div style="display:flex; justify-content:space-between; font-size:13px; padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.03);">
+                    <span style="color:var(--text-muted);">Meta Mensual:</span>
+                    <span style="font-weight:bold; color:var(--primary);">$${parseFloat(goal).toLocaleString()}</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; font-size:13px; padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.03);">
+                    <span style="color:var(--text-muted);">Ticket Promedio:</span>
+                    <span style="font-weight:bold; color:var(--accent);">$${parseFloat(ticket).toLocaleString()}</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; font-size:13px; padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.03);">
+                    <span style="color:var(--text-muted);">Conversión Cotización-Cierre:</span>
+                    <span style="font-weight:bold; color:var(--success);">${(convRate * 100).toFixed(0)}%</span>
+                </div>
+            `;
+
+            if (metrics) {
+                html += `
+                    <div style="margin-top: 10px; background: rgba(255,255,255,0.02); border-radius: 8px; padding: 10px;">
+                        <h5 style="margin-bottom:8px; font-size:12px; color:var(--text-muted); text-transform:uppercase;">Metas del Funnel Calculadas</h5>
+                        <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:8px;">
+                            <div style="border-right: 1px solid rgba(255,255,255,0.05); padding-right:5px;">
+                                <div style="font-size:10px; color:var(--text-muted);">Cierres/Mes</div>
+                                <div style="font-size:16px; font-weight:bold; color:white;">${metrics.sales_needed || 0}</div>
+                            </div>
+                            <div style="padding-left:5px;">
+                                <div style="font-size:10px; color:var(--text-muted);">Cotizaciones/Mes</div>
+                                <div style="font-size:16px; font-weight:bold; color:white;">${metrics.quotes_needed || 0}</div>
+                            </div>
+                            <div style="border-right: 1px solid rgba(255,255,255,0.05); padding-right:5px; border-top:1px solid rgba(255,255,255,0.05); padding-top:5px;">
+                                <div style="font-size:10px; color:var(--text-muted);">Citas/Mes</div>
+                                <div style="font-size:16px; font-weight:bold; color:white;">${metrics.meetings_needed || 0}</div>
+                            </div>
+                            <div style="padding-left:5px; border-top:1px solid rgba(255,255,255,0.05); padding-top:5px;">
+                                <div style="font-size:10px; color:var(--text-muted);">Llamadas/Mes</div>
+                                <div style="font-size:16px; font-weight:bold; color:white;">${metrics.calls_needed || 0}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            container.innerHTML = html;
+        }
+
+        function renderAdvantageChecklist() {
+            if (!advantagePlan || !advantageTodayLog) return;
+            const container = document.getElementById('advantage-checklist-container');
+            container.innerHTML = '';
+
+            const completed = advantageTodayLog.completed_activities || {};
+
+            advantagePlan.activities_config.forEach(act => {
+                const name = act.activity;
+                const points = act.points;
+                const count = completed[name] || 0;
+
+                const itemHtml = `
+                    <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); border-radius:10px; padding:12px 15px;">
+                        <div>
+                            <div style="font-weight:bold; font-family:'Outfit';">${name}</div>
+                            <div style="font-size:11px; color:var(--text-muted); font-weight:normal;">+${points} ${points === 1 ? 'punto' : 'puntos'} por repetición</div>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <button class="btn btn-outline" style="padding:5px 10px; min-width:30px; border-radius:6px;" onclick="adjustActivityCount('${name}', -1)">-</button>
+                            <span style="font-size:18px; font-weight:bold; width:20px; text-align:center;">${count}</span>
+                            <button class="btn btn-outline" style="padding:5px 10px; min-width:30px; border-radius:6px;" onclick="adjustActivityCount('${name}', 1)">+</button>
+                        </div>
+                    </div>
+                `;
+                container.innerHTML += itemHtml;
+            });
+        }
+
+        async function adjustActivityCount(name, delta) {
+            if (!advantageTodayLog || !advantagePlan) return;
+            const userId = window.sellerData.id;
+            
+            const completed = advantageTodayLog.completed_activities || {};
+            const current = completed[name] || 0;
+            const newVal = Math.max(0, current + delta);
+            completed[name] = newVal;
+
+            // Calculate total points locally first to make it responsive
+            const weights = {};
+            advantagePlan.activities_config.forEach(item => {
+                weights[item.activity] = item.points;
+            });
+            let total = 0;
+            for (let k in completed) {
+                total += completed[k] * (weights[k] || 0);
+            }
+            
+            advantageTodayLog.completed_activities = completed;
+            advantageTodayLog.total_points = total;
+            
+            updateAdvantageProgress();
+            renderAdvantageChecklist();
+
+            // Save to DB
+            try {
+                const res = await fetch(`/api/slight-edge/log/${userId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        date_str: getTodayIso(),
+                        completed_activities: completed
+                    })
+                });
+                if (res.ok) {
+                    loadSlightEdgeChartHistory(userId);
+                }
+            } catch (err) {
+                console.error("Error saving log:", err);
+            }
+        }
+
+        async function loadSlightEdgeChartHistory(userId) {
+            try {
+                const res = await fetch(`/api/slight-edge/log/${userId}`);
+                if (!res.ok) return;
+                const logs = await res.json();
+
+                const labels = [];
+                const dataPoints = [];
+                const goalPoints = [];
+
+                logs.forEach(item => {
+                    const parts = item.date.split('-');
+                    const dateObj = new Date(parts[0], parts[1]-1, parts[2]);
+                    const formattedDate = dateObj.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+                    labels.push(formattedDate);
+                    dataPoints.push(item.total_points);
+                    goalPoints.push(advantagePlan ? advantagePlan.daily_points_goal : 10);
+                });
+
+                if (logs.length === 0) {
+                    labels.push("Hoy");
+                    dataPoints.push(0);
+                    goalPoints.push(10);
+                }
+
+                const ctx = document.getElementById('chartSlightEdgeHistory').getContext('2d');
+                
+                if (chartSlightEdgeInstance) {
+                    chartSlightEdgeInstance.destroy();
+                }
+
+                const gradient = ctx.createLinearGradient(0, 0, 0, 200);
+                gradient.addColorStop(0, 'rgba(99, 102, 241, 0.3)');
+                gradient.addColorStop(1, 'rgba(168, 85, 247, 0.0)');
+
+                chartSlightEdgeInstance = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'Puntos Diarios',
+                                data: dataPoints,
+                                borderColor: '#6366f1',
+                                borderWidth: 3,
+                                fill: true,
+                                backgroundColor: gradient,
+                                tension: 0.3,
+                                pointBackgroundColor: '#a855f7',
+                                pointRadius: 4
+                            },
+                            {
+                                label: 'Meta (10 pts)',
+                                data: goalPoints,
+                                borderColor: 'rgba(255, 255, 255, 0.2)',
+                                borderWidth: 1,
+                                borderDash: [5, 5],
+                                fill: false,
+                                pointRadius: 0
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false }
+                        },
+                        scales: {
+                            y: {
+                                min: 0,
+                                grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                                ticks: { color: 'rgba(255, 255, 255, 0.6)' }
+                            },
+                            x: {
+                                grid: { display: false },
+                                ticks: { color: 'rgba(255, 255, 255, 0.6)' }
+                            }
+                        }
+                    }
+                });
+            } catch (err) {
+                console.error("Error building chart:", err);
+            }
+        }
+
+        async function startAdvantageCoaching() {
+            advantageCoachingHistory = [];
+            const container = document.getElementById('advantage-chat-messages');
+            container.innerHTML = '';
+
+            document.getElementById('advantage-no-plan').classList.add('hidden');
+            document.getElementById('advantage-tracker').classList.add('hidden');
+            document.getElementById('advantage-coaching').classList.remove('hidden');
+
+            await sendAdvantageChatMessage(true);
+        }
+
+        function cancelAdvantageCoaching() {
+            loadAdvantageData();
+        }
+
+        async function sendAdvantageChatMessage(initial = false) {
+            const input = document.getElementById('advantage-chat-input');
+            const container = document.getElementById('advantage-chat-messages');
+            
+            let messageText = "";
+            if (initial) {
+                messageText = "Hola, iniciemos mi sesión de coaching para configurar mi plan de La Ventaja.";
+            } else {
+                messageText = input.value.trim();
+                if (!messageText) return;
+                
+                appendChatBubble("user", messageText);
+                input.value = '';
+            }
+
+            input.disabled = true;
+            const typingBubble = appendChatBubble("agent", `<i class="ph ph-spinner ph-spin"></i> Coach está escribiendo...`);
+
+            try {
+                const userId = window.sellerData.id;
+                const res = await fetch(`/api/slight-edge/coaching-chat/${userId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message: messageText,
+                        history: advantageCoachingHistory
+                    })
+                });
+
+                if (!res.ok) throw new Error("Failed to send coaching message");
+                const data = await res.json();
+
+                typingBubble.remove();
+                appendChatBubble("agent", formatMarkdown(data.reply));
+
+                if (!initial) {
+                    advantageCoachingHistory.push({ role: "user", content: messageText });
+                }
+                advantageCoachingHistory.push({ role: "agent", content: data.reply });
+
+                if (data.plan_saved) {
+                    appendChatBubble("system", `<div style="text-align:center; padding:10px;"><button class="btn btn-sm" onclick="loadAdvantageData()"><i class="ph ph-squares-four"></i> Ir a mi Checklist Diario</button></div>`);
+                }
+
+            } catch (err) {
+                console.error("Coaching chat error:", err);
+                typingBubble.remove();
+                appendChatBubble("agent", "Hubo un error al conectar con el Coach de IA. Por favor, intenta de nuevo.");
+            } finally {
+                input.disabled = false;
+                input.focus();
+                container.scrollTop = container.scrollHeight;
+            }
+        }
+
+        function appendChatBubble(role, htmlContent) {
+            const container = document.getElementById('advantage-chat-messages');
+            const bubble = document.createElement('div');
+            
+            if (role === 'user') {
+                bubble.style.cssText = "align-self: flex-end; background: linear-gradient(135deg, #6366f1, #a855f7); color: white; padding: 12px 16px; border-radius: 12px 12px 0 12px; max-width: 80%; line-height: 1.4; box-shadow: 0 4px 15px rgba(99, 102, 241, 0.2);";
+            } else if (role === 'agent') {
+                bubble.style.cssText = "align-self: flex-start; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 12px 16px; border-radius: 12px 12px 12px 0; max-width: 80%; line-height: 1.4;";
+            } else {
+                bubble.style.cssText = "align-self: center; color: var(--text-muted); font-size:12px; max-width: 100%;";
+            }
+
+            bubble.innerHTML = htmlContent;
+            container.appendChild(bubble);
+            container.scrollTop = container.scrollHeight;
+            return bubble;
+        }
+
+        function formatMarkdown(text) {
+            if (!text) return "";
+            return text
+                .replace(/\n/g, '<br>')
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                .replace(/### (.*?)(?:<br>|$)/g, '<h4 style="margin-top:10px; margin-bottom:5px; font-family:\'Outfit\';">$1</h4>')
+                .replace(/## (.*?)(?:<br>|$)/g, '<h3 style="margin-top:12px; margin-bottom:6px; font-family:\'Outfit\';">$1</h3>')
+                .replace(/- (.*?)(?:<br>|$)/g, '• $1<br>');
+        }
+
+        function showAddActivityModal() {
+            document.getElementById('advantage-act-name').value = '';
+            document.getElementById('advantage-act-points').value = '1';
+            document.getElementById('advantage-modal-title').innerText = "Agregar Disciplina";
+            document.getElementById('modal-advantage-activity').classList.remove('hidden');
+        }
+
+        function closeActivityModal() {
+            document.getElementById('modal-advantage-activity').classList.add('hidden');
+        }
+
+        async function saveAdvantageActivity() {
+            const nameInput = document.getElementById('advantage-act-name').value.trim();
+            const pointsInput = parseInt(document.getElementById('advantage-act-points').value) || 1;
+
+            if (!nameInput) return;
+            if (!advantagePlan) return;
+
+            const existing = advantagePlan.activities_config.find(item => item.activity.toLowerCase() === nameInput.toLowerCase());
+            if (existing) {
+                existing.points = pointsInput;
+            } else {
+                advantagePlan.activities_config.push({
+                    activity: nameInput,
+                    points: pointsInput
+                });
+            }
+
+            const userId = window.sellerData.id;
+            try {
+                const res = await fetch(`/api/slight-edge/plan/${userId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(advantagePlan)
+                });
+                if (res.ok) {
+                    closeActivityModal();
+                    await loadAdvantageData();
+                }
+            } catch (err) {
+                console.error("Error saving plan:", err);
+            }
+        }
+
+        function editAdvantagePlanManually() {
+            if (!advantagePlan) return;
+            const listContainer = document.getElementById('advantage-manual-list');
+            listContainer.innerHTML = '';
+
+            advantagePlan.activities_config.forEach((act, idx) => {
+                const itemHtml = `
+                    <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.02); padding:10px; border-radius:8px; border:1px solid rgba(255,255,255,0.05);">
+                        <span style="font-weight:bold; font-size:13px; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${act.activity}</span>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <input type="number" id="manual-weight-${idx}" min="1" max="10" value="${act.points}" style="width:50px; padding:4px 6px; text-align:center; font-size:12px;">
+                            <button class="btn btn-outline btn-danger btn-sm" style="padding:4px 8px;" onclick="deleteManualActivity(${idx})"><i class="ph ph-trash"></i></button>
+                        </div>
+                    </div>
+                `;
+                listContainer.innerHTML += itemHtml;
+            });
+
+            document.getElementById('modal-advantage-plan-manual').classList.remove('hidden');
+        }
+
+        function closePlanManualModal() {
+            document.getElementById('modal-advantage-plan-manual').classList.add('hidden');
+        }
+
+        function deleteManualActivity(index) {
+            if (!advantagePlan) return;
+            advantagePlan.activities_config.splice(index, 1);
+            editAdvantagePlanManually();
+        }
+
+        async function saveAdvantagePlanManual() {
+            if (!advantagePlan) return;
+            
+            advantagePlan.activities_config.forEach((act, idx) => {
+                const input = document.getElementById(`manual-weight-${idx}`);
+                if (input) {
+                    act.points = parseInt(input.value) || 1;
+                }
+            });
+
+            const userId = window.sellerData.id;
+            try {
+                const res = await fetch(`/api/slight-edge/plan/${userId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(advantagePlan)
+                });
+                if (res.ok) {
+                    closePlanManualModal();
+                    await loadAdvantageData();
+                }
+            } catch (err) {
+                console.error("Error saving manual plan changes:", err);
             }
         }
     </script>
