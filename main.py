@@ -69,7 +69,8 @@ def startup_event():
                 "ALTER TABLE users ADD COLUMN photo_url VARCHAR;",
                 "ALTER TABLE companies ADD COLUMN whatsapp_phone_number_id VARCHAR;",
                 "ALTER TABLE companies ADD COLUMN encrypted_whatsapp_token VARCHAR;",
-                "ALTER TABLE companies ADD COLUMN global_goals TEXT;"
+                "ALTER TABLE companies ADD COLUMN global_goals TEXT;",
+                "ALTER TABLE companies ADD COLUMN global_sales_target FLOAT DEFAULT 0.0;"
             ]
             for query in migrations:
                 try:
@@ -108,6 +109,7 @@ class CompanyUpdate(BaseModel):
 
 class GlobalGoalsUpdate(BaseModel):
     global_goals: str
+    global_sales_target: Optional[float] = 0.0
 
 class AIGoalProposalRequest(BaseModel):
     metrics: dict
@@ -239,65 +241,129 @@ def update_global_goals(company_code: str, payload: GlobalGoalsUpdate, db: Sessi
         raise HTTPException(status_code=404, detail="Empresa no encontrada")
     
     company.global_goals = payload.global_goals
+    if payload.global_sales_target is not None:
+        company.global_sales_target = payload.global_sales_target
     db.commit()
-    return {"status": "ok", "global_goals": company.global_goals}
+    return {
+        "status": "ok", 
+        "global_goals": company.global_goals,
+        "global_sales_target": company.global_sales_target
+    }
+
+def categorize_activity(name: str) -> str:
+    n = name.lower().strip()
+    if any(x in n for x in ["llam", "call", "prospect"]):
+        return "llamada"
+    if any(x in n for x in ["cit", "reun", "meet"]):
+        return "cita"
+    if any(x in n for x in ["cotiz", "propuest", "presupuest", "quot"]):
+        return "cotizacion"
+    if any(x in n for x in ["cierr", "vent", "cobro", "clos"]):
+        return "venta"
+    return "otra"
 
 @app.get("/companies/{company_code}/dashboard")
 def get_dashboard_metrics(company_code: str, db: Session = Depends(get_db)):
+    from datetime import date, timedelta
     company = db.query(Company).filter(Company.company_code == company_code).first()
     if not company:
         raise HTTPException(status_code=404, detail="Empresa no encontrada")
     
     sellers = db.query(User).filter(User.company_id == company.id).all()
     
-    # Mock data generation based on sellers for MVP visualization
-    # Real data would come from reading CRM Sheets
-    import random
-    
     metrics_list = []
-    total_sales = 0
-    total_target = 0
+    total_sales = 0.0
+    total_target = 0.0
+    
+    start_date = date.today() - timedelta(days=30)
     
     for s in sellers:
-        # Generate stable mock data using user ID as seed
-        random.seed(s.id + 100) 
-        target = random.randint(10000, 50000)
-        sales = int(target * random.uniform(0.4, 1.1))
-        conv_rate = round(random.uniform(15, 45), 1)
-        roi = round(random.uniform(1.2, 3.5), 1)
-        clients = random.randint(20, 150)
+        # Get SlightEdgePlan
+        plan = db.query(SlightEdgePlan).filter(SlightEdgePlan.user_id == s.id).first()
+        target = plan.monthly_income_goal if plan else 0.0
+        ticket = plan.ticket_average if plan else 0.0
+        planned_conv_rate = plan.conversion_rate if plan else 0.0
         
+        # Get logs for the last 30 days
+        logs = db.query(SlightEdgeLog).filter(
+            SlightEdgeLog.user_id == s.id,
+            SlightEdgeLog.date >= start_date
+        ).all()
+        
+        completed_calls = 0
+        completed_meetings = 0
+        completed_quotes = 0
+        completed_sales = 0
+        total_points = 0
+        
+        for log in logs:
+            total_points += log.total_points or 0
+            comp = log.completed_activities or {}
+            for act_name, count in comp.items():
+                cat = categorize_activity(act_name)
+                val = max(0, count)
+                if cat == "llamada":
+                    completed_calls += val
+                elif cat == "cita":
+                    completed_meetings += val
+                elif cat == "cotizacion":
+                    completed_quotes += val
+                elif cat == "venta":
+                    completed_sales += val
+        
+        actual_sales_amount = completed_sales * ticket
+        avg_daily_points = round(total_points / len(logs), 1) if logs else 0.0
+        
+        if completed_meetings > 0:
+            actual_conv_rate = round((completed_sales / completed_meetings) * 100, 1)
+        else:
+            actual_conv_rate = planned_conv_rate
+            
         metrics_list.append({
             "id": s.id,
             "name": s.name,
             "role": s.role,
-            "sales_goals": s.sales_goals,
+            "sales_goals": s.sales_goals or f"Meta: ${target:,.2f}",
             "metrics": {
-                "sales": sales,
+                "sales": actual_sales_amount,
                 "target": target,
-                "conversion_rate": conv_rate,
-                "roi": roi,
-                "clients": clients
+                "conversion_rate": actual_conv_rate,
+                "roi": avg_daily_points, # mapping consistency points to roi for UI compatibility
+                "clients": completed_calls # mapping calls to clients
+            },
+            "slight_edge": {
+                "monthly_income_goal": target,
+                "ticket_average": ticket,
+                "planned_conversion_rate": planned_conv_rate,
+                "actual_sales": actual_sales_amount,
+                "avg_daily_points": avg_daily_points,
+                "completed_calls": completed_calls,
+                "completed_meetings": completed_meetings,
+                "completed_quotes": completed_quotes,
+                "completed_sales": completed_sales,
+                "logged_days": len(logs)
             }
         })
         
-        total_sales += sales
+        total_sales += actual_sales_amount
         total_target += target
         
     return {
         "global_goals": company.global_goals,
+        "global_sales_target": company.global_sales_target or 0.0,
         "company_name": company.name,
         "aggregated": {
             "total_sales": total_sales,
             "total_target": total_target,
-            "avg_conversion": round(sum([m["metrics"]["conversion_rate"] for m in metrics_list]) / len(metrics_list), 1) if metrics_list else 0,
-            "avg_roi": round(sum([m["metrics"]["roi"] for m in metrics_list]) / len(metrics_list), 1) if metrics_list else 0
+            "avg_conversion": round(sum([m["metrics"]["conversion_rate"] for m in metrics_list]) / len(metrics_list), 1) if metrics_list else 0.0,
+            "avg_roi": round(sum([m["metrics"]["roi"] for m in metrics_list]) / len(metrics_list), 1) if metrics_list else 0.0
         },
         "sellers": metrics_list
     }
 
 @app.post("/companies/{company_code}/sellers/{seller_id}/ai-goals")
 def suggest_ai_goals(company_code: str, seller_id: int, payload: AIGoalProposalRequest, db: Session = Depends(get_db)):
+    from datetime import date, timedelta
     company = db.query(Company).filter(Company.company_code == company_code).first()
     if not company:
         raise HTTPException(status_code=404, detail="Empresa no encontrada")
@@ -307,22 +373,74 @@ def suggest_ai_goals(company_code: str, seller_id: int, payload: AIGoalProposalR
         raise HTTPException(status_code=404, detail="Vendedor no encontrado en esta empresa")
         
     try:
+        # Get SlightEdgePlan
+        plan = db.query(SlightEdgePlan).filter(SlightEdgePlan.user_id == seller.id).first()
+        target = plan.monthly_income_goal if plan else 0.0
+        ticket = plan.ticket_average if plan else 0.0
+        planned_conv_rate = plan.conversion_rate if plan else 0.0
+        daily_points_goal = plan.daily_points_goal if plan else 10
+        activities_config = plan.activities_config if plan else []
+        
+        # Get logs for the last 30 days
+        start_date = date.today() - timedelta(days=30)
+        logs = db.query(SlightEdgeLog).filter(
+            SlightEdgeLog.user_id == seller.id,
+            SlightEdgeLog.date >= start_date
+        ).all()
+        
+        completed_calls = 0
+        completed_meetings = 0
+        completed_quotes = 0
+        completed_sales = 0
+        total_points = 0
+        
+        for log in logs:
+            total_points += log.total_points or 0
+            comp = log.completed_activities or {}
+            for act_name, count in comp.items():
+                cat = categorize_activity(act_name)
+                val = max(0, count)
+                if cat == "llamada":
+                    completed_calls += val
+                elif cat == "cita":
+                    completed_meetings += val
+                elif cat == "cotizacion":
+                    completed_quotes += val
+                elif cat == "venta":
+                    completed_sales += val
+        
+        actual_sales_amount = completed_sales * ticket
+        avg_daily_points = round(total_points / len(logs), 1) if logs else 0.0
+        
         from agent.gemini_agent import GenerativeModel
         model = GenerativeModel(model_name="gemini-2.5-pro")
         
         prompt = f"""
-        Eres un analista de ventas experto. La empresa '{company.name}' tiene las siguientes Metas Globales:
-        {company.global_goals or 'No definidas explícitamente, asume maximizar ingresos y retención.'}
+        Eres un coach de ventas experto especializado en la metodología "La Ligera Ventaja" (The Slight Edge) de Jeff Olson.
+        La empresa '{company.name}' tiene las siguientes directrices y metas:
+        - Meta de Facturación Mensual Global de la Empresa: ${company.global_sales_target:,.2f}
+        - Estrategia Global: {company.global_goals or 'Maximizar ingresos y consistencia.'}
         
-        El vendedor '{seller.name}' tiene este rendimiento actual:
-        - Ventas Logradas: ${payload.metrics.get('sales', 0)}
-        - Clientes Atendidos: {payload.metrics.get('clients', 0)}
-        - Tasa de Conversión: {payload.metrics.get('conversion_rate', 0)}%
-        - ROI: {payload.metrics.get('roi', 0)}x
+        Analiza al vendedor '{seller.name}' con base en su plan de La Ventaja y su desempeño de los últimos 30 días:
         
-        Genera una propuesta de "Metas de Venta" personalizadas para este vendedor (máximo 3 párrafos cortos).
-        Deben ser accionables, alineadas a las metas globales de la empresa, pero considerando su rendimiento actual.
-        No uses saludos ni introducciones, responde directamente con las metas.
+        PLAN ACTUAL DE LA VENTAJA:
+        - Meta de ingresos mensuales del vendedor: ${target:,.2f}
+        - Ticket promedio: ${ticket:,.2f}
+        - Tasa de conversión planificada: {planned_conv_rate}%
+        - Meta diaria de puntos: {daily_points_goal} pts
+        - Disciplinas diarias configuradas en su plan: {activities_config}
+        
+        RENDIMIENTO REAL EN LOS ÚLTIMOS 30 DÍAS:
+        - Llamadas completadas: {completed_calls}
+        - Citas completadas: {completed_meetings}
+        - Cotizaciones completadas: {completed_quotes}
+        - Ventas reales logradas (cierres): {completed_sales} (Monto estimado: ${actual_sales_amount:,.2f})
+        - Consistencia promedio diaria: {avg_daily_points} pts (Meta diaria: {daily_points_goal} pts)
+        - Días con registro de actividades: {len(logs)} días
+        
+        Genera una sugerencia de coaching concisa y accionable para este vendedor (máximo 3 párrafos cortos, en español).
+        Compara su desempeño real contra sus metas planificadas y sugiere si debe ajustar sus disciplinas, mejorar su consistencia diaria, o si sus metas están correctamente alineadas para lograr el éxito global de la empresa.
+        No uses saludos ni introducciones, responde directamente con la recomendación.
         """
         
         response = model.generate_content(prompt)
