@@ -163,14 +163,14 @@ class GoogleCalendarService:
         if reminders is not None:
             event_body["reminders"] = reminders
         else:
-            if default_reminders:
-                event_body["reminders"] = {"useDefault": True}
-            else:
-                # If calendar has absolutely no default notifications, set a fallback popup reminder
-                event_body["reminders"] = {
-                    "useDefault": False,
-                    "overrides": [{"method": "popup", "minutes": 15}]
-                }
+            # Ensure robust notifications for agent-created events instead of relying solely on defaults
+            event_body["reminders"] = {
+                "useDefault": False,
+                "overrides": [
+                    {"method": "popup", "minutes": 15},
+                    {"method": "email", "minutes": 60}
+                ]
+            }
 
         created_event = service.events().insert(
             calendarId=calendar_id,

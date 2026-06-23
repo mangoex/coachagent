@@ -607,28 +607,62 @@ def get_accountability_logs(user_id: int, db: Session = Depends(get_db)):
         DailyActivityLog.date >= start_month
     ).all()
     
+    # Query completed calendar audits
+    audits = db.query(CalendarEventAudit).filter(
+        CalendarEventAudit.user_id == user_id,
+        CalendarEventAudit.is_completed == True
+    ).all()
+    
+    # Count completed events by local date
+    completed_events_by_date = {}
+    for audit in audits:
+        dt_to_use = audit.event_start or audit.created_at
+        if dt_to_use:
+            dt_local = dt_to_use.astimezone(tz) if dt_to_use.tzinfo else tz.localize(dt_to_use)
+            d = dt_local.date()
+            if d >= start_month:
+                completed_events_by_date[d] = completed_events_by_date.get(d, 0) + 1
+                
+    # Gather all dates to process
+    all_dates = set()
+    log_map = {}
+    for log in logs:
+        all_dates.add(log.date)
+        log_map[log.date] = log
+        
+    for d in completed_events_by_date.keys():
+        all_dates.add(d)
+    
     # Sum up actuals
     today_log = {"citas": 0, "llamadas": 0, "propuestas": 0}
     weekly = {"citas": 0, "llamadas": 0, "propuestas": 0}
     monthly = {"citas": 0, "llamadas": 0, "propuestas": 0}
     
-    for log in logs:
+    for d in all_dates:
+        log = log_map.get(d)
+        citas_log = log.citas_completadas if (log and log.citas_completadas is not None) else 0
+        llamadas_comp = log.llamadas_completadas if (log and log.llamadas_completadas is not None) else 0
+        propuestas_comp = log.propuestas_completadas if (log and log.propuestas_completadas is not None) else 0
+        
+        # Max of logged value and calendar audit count
+        citas_comp = max(citas_log, completed_events_by_date.get(d, 0))
+        
         # Check today
-        if log.date == today:
-            today_log["citas"] = log.citas_completadas
-            today_log["llamadas"] = log.llamadas_completadas
-            today_log["propuestas"] = log.propuestas_completadas
+        if d == today:
+            today_log["citas"] = citas_comp
+            today_log["llamadas"] = llamadas_comp
+            today_log["propuestas"] = propuestas_comp
         
         # Check current week
-        if log.date >= start_week:
-            weekly["citas"] += log.citas_completadas
-            weekly["llamadas"] += log.llamadas_completadas
-            weekly["propuestas"] += log.propuestas_completadas
+        if d >= start_week:
+            weekly["citas"] += citas_comp
+            weekly["llamadas"] += llamadas_comp
+            weekly["propuestas"] += propuestas_comp
             
         # Monthly is all logs since start_month
-        monthly["citas"] += log.citas_completadas
-        monthly["llamadas"] += log.llamadas_completadas
-        monthly["propuestas"] += log.propuestas_completadas
+        monthly["citas"] += citas_comp
+        monthly["llamadas"] += llamadas_comp
+        monthly["propuestas"] += propuestas_comp
         
     # Get plan
     plan = db.query(AccountabilityPlan).filter(AccountabilityPlan.user_id == user_id).first()
@@ -807,6 +841,10 @@ def complete_calendar_event(user_id: int, event_id: str, payload: EventCompletio
         if not log:
             log = DailyActivityLog(user_id=user_id, date=log_date, citas_completadas=0, llamadas_completadas=0, propuestas_completadas=0)
             db.add(log)
+        else:
+            if log.citas_completadas is None: log.citas_completadas = 0
+            if log.llamadas_completadas is None: log.llamadas_completadas = 0
+            if log.propuestas_completadas is None: log.propuestas_completadas = 0
             
         log.citas_completadas += 1
         db.commit()

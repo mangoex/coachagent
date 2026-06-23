@@ -186,6 +186,10 @@ async def receive_message(request: Request, db: Session = Depends(get_db)):
                 if not log:
                     log = DailyActivityLog(user_id=user.id, date=log_date, citas_completadas=0, llamadas_completadas=0, propuestas_completadas=0)
                     db.add(log)
+                else:
+                    if log.citas_completadas is None: log.citas_completadas = 0
+                    if log.llamadas_completadas is None: log.llamadas_completadas = 0
+                    if log.propuestas_completadas is None: log.propuestas_completadas = 0
                 log.citas_completadas += 1
                 db.commit()
                 

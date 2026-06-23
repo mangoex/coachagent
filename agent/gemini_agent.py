@@ -18,6 +18,7 @@ from config.settings import settings
 from services.calendar_service import GoogleCalendarService
 from services.sheets_service import GoogleSheetsService
 from services.docs_service import GoogleDocsService
+from services.tasks_service import GoogleTasksService
 
 logger = logging.getLogger(__name__)
 
@@ -45,10 +46,11 @@ class GeminiAgent:
                 self.system_instruction = (
                     "Eres el 'Google AI Sales Coach Agent', un asistente de ventas proactivo y altamente capacitado.\n"
                     "Tu objetivo es ayudar a los vendedores a gestionar su agenda, dar seguimiento a clientes y automatizar cotizaciones.\n"
-                    "Tienes acceso a herramientas de Google Workspace (Calendar, Sheets, Docs).\n"
+                    "Tienes acceso a herramientas nativas de Google Workspace (Calendar, Tasks, Sheets, Docs) para las notificaciones y recordatorios.\n"
                     "Cuando se te solicite leer el CRM o ver los clientes/productos/precios, lee el CRM en Google Sheets.\n"
                     "Cuando se apruebe una cotización, usa la herramienta generate_quotation para generar la propuesta y devuélvele al vendedor el enlace firmado del PDF resultante.\n"
                     "Tienes acceso a herramientas de accountability: si el vendedor te dice que hoy realizó llamadas, citas o propuestas, puedes usar la herramienta log_user_activities para registrarlas. También puedes usar get_user_accountability_progress para verificar cómo va el vendedor con respecto a sus metas diarias, semanales y mensuales y decírselo de forma motivadora y concisa.\n"
+                    "Reglas de comunicación por WhatsApp: Cuando el vendedor te pida agendar una cita o tarea, usa las herramientas nativas (Calendar o Tasks). Para citas con clientes, usa create_calendar_event agregando su email en attendees para que le llegue confirmación automática por correo. Para recordatorios de seguimiento personal, usa create_google_task para que la alerta suene en su Google Calendar. En WhatsApp responde SIEMPRE de manera muy breve (ej: 'Listo, agendado en tu Calendar/Tasks'). Evita enviar mensajes largos de confirmación.\n"
                     "Mantén un tono profesional, motivador, conciso y enfocado a objetivos comerciales. Responde en español.\n"
                 )
                 
@@ -216,6 +218,29 @@ class GeminiAgent:
             except Exception as e:
                 return f"Error deleting event: {str(e)}"
 
+        def create_google_task(title: str, notes: str = "", due_date_iso: str = "") -> str:
+            """
+            Create a new task in Google Tasks. Use this for daily to-dos and reminders.
+            
+            Args:
+                title: The title of the task.
+                notes: Additional details or notes for the task.
+                due_date_iso: The due date in ISO 8601 format (e.g. '2026-06-16T10:00:00Z').
+            """
+            auth_err = _check_auth()
+            if auth_err: return auth_err
+            try:
+                task = GoogleTasksService.create_task(
+                    refresh_token=self.refresh_token,
+                    title=title,
+                    notes=notes or None,
+                    due_date_iso=due_date_iso or None
+                )
+                return f"Task created successfully in Google Tasks: {task.get('title')}"
+            except Exception as e:
+                logger.error(f"Failed to create task: {str(e)}")
+                return f"Error creating task: {str(e)}"
+
         def read_crm_data() -> str:
             """
             Read client list, products, and prices from the spreadsheet CRM.
@@ -354,6 +379,10 @@ class GeminiAgent:
                     log = DailyActivityLog(user_id=user.id, date=log_date, citas_completadas=0, llamadas_completadas=0, propuestas_completadas=0)
                     db.add(log)
                     db.flush()
+                else:
+                    if log.citas_completadas is None: log.citas_completadas = 0
+                    if log.llamadas_completadas is None: log.llamadas_completadas = 0
+                    if log.propuestas_completadas is None: log.propuestas_completadas = 0
 
                 # Incrementamos las actividades
                 log.citas_completadas += citas
@@ -383,7 +412,7 @@ class GeminiAgent:
                 return "Error: No se dispone del número telefónico para consultar el progreso."
 
             from database.connection import SessionLocal
-            from database.models import User, AccountabilityPlan, DailyActivityLog
+            from database.models import User, AccountabilityPlan, DailyActivityLog, CalendarEventAudit
             from datetime import datetime, timedelta
             import pytz
 
@@ -418,23 +447,56 @@ class GeminiAgent:
                     DailyActivityLog.date >= start_month
                 ).all()
 
+                # Consultar citas completadas
+                audits = db.query(CalendarEventAudit).filter(
+                    CalendarEventAudit.user_id == user.id,
+                    CalendarEventAudit.is_completed == True
+                ).all()
+
+                # Contar citas completadas por fecha local
+                completed_events_by_date = {}
+                for audit in audits:
+                    dt_to_use = audit.event_start or audit.created_at
+                    if dt_to_use:
+                        dt_local = dt_to_use.astimezone(tz) if dt_to_use.tzinfo else tz.localize(dt_to_use)
+                        d = dt_local.date()
+                        if d >= start_month:
+                            completed_events_by_date[d] = completed_events_by_date.get(d, 0) + 1
+
+                # Combinar todas las fechas a procesar
+                all_dates = set()
+                log_map = {}
+                for log in logs:
+                    all_dates.add(log.date)
+                    log_map[log.date] = log
+
+                for d in completed_events_by_date.keys():
+                    all_dates.add(d)
+
                 # Sumar acumulados
                 today_acts = {"citas": 0, "llamadas": 0, "propuestas": 0}
                 weekly_acts = {"citas": 0, "llamadas": 0, "propuestas": 0}
                 monthly_acts = {"citas": 0, "llamadas": 0, "propuestas": 0}
 
-                for log in logs:
-                    if log.date == today:
-                        today_acts["citas"] = log.citas_completadas
-                        today_acts["llamadas"] = log.llamadas_completadas
-                        today_acts["propuestas"] = log.propuestas_completadas
-                    if log.date >= start_week:
-                        weekly_acts["citas"] += log.citas_completadas
-                        weekly_acts["llamadas"] += log.llamadas_completadas
-                        weekly_acts["propuestas"] += log.propuestas_completadas
-                    monthly_acts["citas"] += log.citas_completadas
-                    monthly_acts["llamadas"] += log.llamadas_completadas
-                    monthly_acts["propuestas"] += log.propuestas_completadas
+                for d in all_dates:
+                    log = log_map.get(d)
+                    citas_log = log.citas_completadas if (log and log.citas_completadas is not None) else 0
+                    llamadas_comp = log.llamadas_completadas if (log and log.llamadas_completadas is not None) else 0
+                    propuestas_comp = log.propuestas_completadas if (log and log.propuestas_completadas is not None) else 0
+
+                    citas_comp = max(citas_log, completed_events_by_date.get(d, 0))
+
+                    if d == today:
+                        today_acts["citas"] = citas_comp
+                        today_acts["llamadas"] = llamadas_comp
+                        today_acts["propuestas"] = propuestas_comp
+                    if d >= start_week:
+                        weekly_acts["citas"] += citas_comp
+                        weekly_acts["llamadas"] += llamadas_comp
+                        weekly_acts["propuestas"] += propuestas_comp
+                    monthly_acts["citas"] += citas_comp
+                    monthly_acts["llamadas"] += llamadas_comp
+                    monthly_acts["propuestas"] += propuestas_comp
 
                 def report_section(name, actual, target):
                     if target <= 0:
@@ -473,7 +535,8 @@ class GeminiAgent:
             "generate_quotation": generate_quotation,
             "schedule_followup": schedule_followup,
             "log_user_activities": log_user_activities,
-            "get_user_accountability_progress": get_user_accountability_progress
+            "get_user_accountability_progress": get_user_accountability_progress,
+            "create_google_task": create_google_task
         }
         declarations = [FunctionDeclaration.from_func(func) for func in self.tools_map.values()]
         self.tools_list = Tool(function_declarations=declarations)
