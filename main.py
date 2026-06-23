@@ -66,6 +66,7 @@ def startup_event():
                 "ALTER TABLE users ADD COLUMN sales_goals TEXT;",
                 "ALTER TABLE users ADD COLUMN objectives TEXT;",
                 "ALTER TABLE users ADD COLUMN calendar_id VARCHAR DEFAULT 'primary';",
+                "ALTER TABLE users ADD COLUMN photo_url VARCHAR;",
                 "ALTER TABLE companies ADD COLUMN whatsapp_phone_number_id VARCHAR;",
                 "ALTER TABLE companies ADD COLUMN encrypted_whatsapp_token VARCHAR;",
                 "ALTER TABLE companies ADD COLUMN global_goals TEXT;"
@@ -134,6 +135,7 @@ class SellerUpdate(BaseModel):
     phone_number: Optional[str] = None
     sales_goals: Optional[str] = None
     objectives: Optional[str] = None
+    photo_url: Optional[str] = None
 
 class AIGoalsCalculationRequest(BaseModel):
     product_service: str
@@ -980,6 +982,7 @@ def get_seller_profile(email: str, db: Session = Depends(get_db)):
         "phone_number": user.phone_number,
         "role": user.role,
         "sales_goals": user.sales_goals,
+        "photo_url": user.photo_url,
         "is_google_connected": user.encrypted_refresh_token is not None and user.encrypted_refresh_token != "",
         "company_code": user.company.company_code if user.company else None
     }
@@ -996,6 +999,8 @@ def update_seller_profile(email: str, payload: SellerUpdate, db: Session = Depen
         user.phone_number = payload.phone_number
     if payload.sales_goals is not None:
         user.sales_goals = payload.sales_goals
+    if payload.photo_url is not None:
+        user.photo_url = payload.photo_url
         
     db.commit()
     return {"detail": "Perfil actualizado exitosamente"}

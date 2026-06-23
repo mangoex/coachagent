@@ -46,6 +46,7 @@ class User(Base):
     company_id = Column(Integer, ForeignKey("companies.id", ondelete="SET NULL"), nullable=True)
     sales_goals = Column(Text, nullable=True)
     objectives = Column(Text, nullable=True)
+    photo_url = Column(String, nullable=True)
     
     encrypted_refresh_token = Column(Text, nullable=True)
     

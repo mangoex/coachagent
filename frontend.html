@@ -591,6 +591,9 @@
                         <h4 id="user-profile-name">Cargando...</h4>
                         <p id="user-profile-email">email@google.com</p>
                     </div>
+                    <button onclick="showAppView('settings')" style="background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center; margin-left: auto;" title="Configuración de Cuenta">
+                        <i class="ph ph-gear" style="font-size: 20px;"></i>
+                    </button>
                 </div>
                 <button class="btn btn-outline btn-danger" style="width:100%; padding: 10px;" onclick="window.firebaseLogout()">
                     <i class="ph ph-sign-out"></i> Cerrar Sesión
@@ -736,6 +739,16 @@
                         <label>Correo Electrónico (Google)</label>
                         <input type="email" id="set_email" readonly style="opacity:0.7; cursor:not-allowed;">
                         <p style="font-size:11px; color:var(--text-muted); margin-top:4px;">El correo principal no se puede cambiar ya que es tu identidad en Firebase.</p>
+                    </div>
+                    
+                    <div class="form-group" style="display:flex; align-items:center; gap:20px; margin-bottom: 20px; background: rgba(255,255,255,0.02); padding: 15px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.05);">
+                        <img id="set_photo_preview" src="" alt="Profile Preview" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 2px solid var(--primary); background: rgba(0,0,0,0.2);">
+                        <div style="flex:1;">
+                            <label style="display:block; margin-bottom:8px; font-weight:bold; font-size:13px;">Foto de Perfil</label>
+                            <input type="file" id="set_photo_file" accept="image/*" style="display:none;" onchange="handlePhotoUpload(event)">
+                            <button class="btn btn-outline btn-sm" onclick="document.getElementById('set_photo_file').click()" type="button" style="padding: 6px 12px; font-size:12px;"><i class="ph ph-image"></i> Seleccionar Archivo</button>
+                            <input type="text" id="set_photo_url" placeholder="O pega una URL de imagen externa" style="margin-top:8px; font-size:12px; padding:6px 10px; width: 100%;">
+                        </div>
                     </div>
                     
                     <div class="form-group">
@@ -1282,7 +1295,8 @@
                         <label>Puntos / Peso (por cada repetición)</label>
                         <input type="number" id="advantage-act-points" min="1" max="10" value="1">
                     </div>
-                    <div style="display:flex; gap:10px; justify-content:flex-end;">
+                    <div style="display:flex; gap:10px; justify-content:flex-end; align-items:center;">
+                        <button class="btn btn-outline btn-danger btn-sm" id="btn-delete-advantage-activity" onclick="deleteAdvantageActivity()" style="margin-right:auto; display:none; padding:8px 12px; font-size:12px;"><i class="ph ph-trash"></i> Eliminar</button>
                         <button class="btn btn-outline" onclick="closeActivityModal()">Cancelar</button>
                         <button class="btn" id="btn-save-advantage-activity" onclick="saveAdvantageActivity()">Guardar</button>
                     </div>
@@ -1598,6 +1612,12 @@
                     document.getElementById('set_name').value = data.name || '';
                     document.getElementById('set_phone').value = data.phone_number || '';
                     document.getElementById('set_goals').value = data.sales_goals || '';
+                    
+                    const photoSrc = data.photo_url || (window.currentUser ? window.currentUser.photoURL : '') || "https://ui-avatars.com/api/?name=" + encodeURIComponent(email);
+                    document.getElementById('set_photo_url').value = data.photo_url || '';
+                    document.getElementById('set_photo_preview').src = photoSrc;
+                    document.getElementById('user-profile-img').src = photoSrc;
+                    document.getElementById('user-profile-name').textContent = data.name || email.split('@')[0];
 
                     // Google Workspace Status
                     const iconEl = document.getElementById('dash_google_icon');
@@ -1818,9 +1838,21 @@
             chatMsgs.scrollTop = chatMsgs.scrollHeight;
         }
 
+        function handlePhotoUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('set_photo_url').value = e.target.result;
+                    document.getElementById('set_photo_preview').src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
         async function saveSettings() {
-            const userId = window.sellerData ? window.sellerData.id : null;
-            if(!userId) return;
+            const email = window.currentUser ? window.currentUser.email : null;
+            if(!email) return;
             
             const btn = document.querySelector('#view-settings .btn');
             btn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Guardando...';
@@ -1829,21 +1861,22 @@
             const payload = {
                 name: document.getElementById('set_name').value,
                 phone_number: document.getElementById('set_phone').value,
-                sales_goals: document.getElementById('set_goals').value
+                sales_goals: document.getElementById('set_goals').value,
+                photo_url: document.getElementById('set_photo_url').value
             };
 
             try {
-                // Update basic info (Not implemented in backend, assuming /seller/{id}/goals handles goals)
-                const res = await fetch(`/seller/${userId}/goals`, {
+                // Update basic info via PUT /seller/{email}
+                const res = await fetch(`/seller/${email}`, {
                     method: 'PUT',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ sales_goals: payload.sales_goals })
+                    body: JSON.stringify(payload)
                 });
                 
                 // Save Calendar setting independently if modified
                 const selectedCal = document.getElementById('set_calendar').value;
                 if (selectedCal) {
-                    await fetch('/api/settings/calendar?email=' + encodeURIComponent(window.currentUser.email), {
+                    await fetch('/api/settings/calendar?email=' + encodeURIComponent(email), {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify({ calendar_id: selectedCal })
@@ -1852,16 +1885,22 @@
                 
                 if(res.ok) {
                     showAlert('settingsAlert', '¡Perfil actualizado exitosamente!', true);
-                    // Actualizar el teléfono en los datos cacheados
+                    
+                    // Actualizar datos locales
                     if(window.sellerData) {
                         window.sellerData.name = payload.name;
                         window.sellerData.phone_number = payload.phone_number;
                         window.sellerData.sales_goals = payload.sales_goals;
+                        window.sellerData.photo_url = payload.photo_url;
                     }
+                    
+                    // Refrescar el dashboard
+                    await loadDashboard(email);
                 } else {
                     showAlert('settingsAlert', 'Error al guardar los cambios.', false);
                 }
             } catch(e) {
+                console.error("Error saving settings:", e);
                 showAlert('settingsAlert', 'Error de conexión', false);
             }
             
@@ -2820,9 +2859,14 @@
                     todayLog = await resToday.json();
                 }
 
-                // Fetch history for weekly points
+                // Fetch history for weekly points and KPI calculation
                 const resHist = await fetch(`/api/slight-edge/log/${userId}`);
                 let weeklyPoints = 0;
+                let realCalls = 0;
+                let realMeetings = 0;
+                let realQuotes = 0;
+                let realSales = 0;
+
                 if (resHist.ok) {
                     const logs = await resHist.json();
                     
@@ -2837,6 +2881,22 @@
                         const logDate = new Date(log.date + 'T00:00:00');
                         if (logDate >= monday) {
                             weeklyPoints += log.total_points || 0;
+                        }
+
+                        // Process activities fuzzy matching for the last 30 days
+                        const completed = log.completed_activities || {};
+                        for (const [name, count] of Object.entries(completed)) {
+                            const lowerName = name.toLowerCase();
+                            const val = parseInt(count) || 0;
+                            if (lowerName.includes('llam') || lowerName.includes('call') || lowerName.includes('teléfono') || lowerName.includes('telefono')) {
+                                realCalls += val;
+                            } else if (lowerName.includes('cita') || lowerName.includes('meeting') || lowerName.includes('reunión') || lowerName.includes('reunion') || lowerName.includes('visita')) {
+                                realMeetings += val;
+                            } else if (lowerName.includes('cotiz') || lowerName.includes('propuesta') || lowerName.includes('quote') || lowerName.includes('presupuesto')) {
+                                realQuotes += val;
+                            } else if (lowerName.includes('cerr') || lowerName.includes('venta') || lowerName.includes('cierre') || lowerName.includes('close') || lowerName.includes('contrato')) {
+                                realSales += val;
+                            }
                         }
                     });
                 }
@@ -2858,6 +2918,28 @@
                     actsHtml = '<span style="color:var(--text-muted); font-size:13px;">Ninguna actividad registrada hoy.</span>';
                 }
 
+                // Planned targets from the coach
+                const targetCalls = plan.funnel_metrics?.calls_needed || 0;
+                const targetMeetings = plan.funnel_metrics?.meetings_needed || 0;
+                const targetQuotes = plan.funnel_metrics?.quotes_needed || 0;
+                const targetSales = plan.funnel_metrics?.sales_needed || 0;
+                const planConversion = (plan.conversion_rate || 0) * (plan.conversion_rate < 1 ? 100 : 1);
+
+                // Real conversion and efficiency calculation
+                let realConversion = 0;
+                if (realMeetings > 0) {
+                    realConversion = (realSales / realMeetings) * 100;
+                } else if (realQuotes > 0) {
+                    realConversion = (realSales / realQuotes) * 100;
+                }
+
+                let efficiency = 0;
+                if (realCalls > 0) {
+                    efficiency = (realMeetings / realCalls) * 100;
+                } else if (realMeetings > 0) {
+                    efficiency = (realQuotes / realMeetings) * 100;
+                }
+
                 container.innerHTML = `
                     <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:20px;">
                         <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); padding:15px; border-radius:10px; text-align:center;">
@@ -2877,6 +2959,49 @@
                             ${actsHtml}
                         </div>
                     </div>
+                    
+                    <div style="margin-top: 25px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 20px;">
+                        <div style="font-size: 13px; font-weight: bold; font-family:'Outfit'; color: white; margin-bottom: 12px; display:flex; align-items:center; gap:6px;">
+                            <i class="ph ph-chart-bar" style="color:var(--success);"></i> KPIs de Ventas (Efecto Compuesto de los últimos 30 días)
+                        </div>
+                        
+                        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap:12px;">
+                            <div style="background: rgba(0,0,0,0.15); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.03);">
+                                <div style="font-size:10px; color:var(--text-muted); text-transform:uppercase;">Llamadas</div>
+                                <div style="font-size:16px; font-weight:bold; margin-top:4px;">${realCalls} <span style="font-size:10px; font-weight:normal; color:var(--text-muted);">/ ${targetCalls} meta</span></div>
+                            </div>
+                            <div style="background: rgba(0,0,0,0.15); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.03);">
+                                <div style="font-size:10px; color:var(--text-muted); text-transform:uppercase;">Citas</div>
+                                <div style="font-size:16px; font-weight:bold; margin-top:4px;">${realMeetings} <span style="font-size:10px; font-weight:normal; color:var(--text-muted);">/ ${targetMeetings} meta</span></div>
+                            </div>
+                            <div style="background: rgba(0,0,0,0.15); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.03);">
+                                <div style="font-size:10px; color:var(--text-muted); text-transform:uppercase;">Cotizaciones</div>
+                                <div style="font-size:16px; font-weight:bold; margin-top:4px;">${realQuotes} <span style="font-size:10px; font-weight:normal; color:var(--text-muted);">/ ${targetQuotes} meta</span></div>
+                            </div>
+                            <div style="background: rgba(0,0,0,0.15); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.03);">
+                                <div style="font-size:10px; color:var(--text-muted); text-transform:uppercase;">Ventas</div>
+                                <div style="font-size:16px; font-weight:bold; margin-top:4px; color: var(--success);">${realSales} <span style="font-size:10px; font-weight:normal; color:var(--text-muted);">/ ${targetSales} meta</span></div>
+                            </div>
+                        </div>
+                        
+                        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:12px; margin-top:12px;">
+                            <div style="background: rgba(0,0,0,0.2); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.03); display:flex; justify-content:space-between; align-items:center;">
+                                <div>
+                                    <div style="font-size:10px; color:var(--text-muted); text-transform:uppercase;">Efectividad (Conversión Real)</div>
+                                    <div style="font-size:18px; font-weight:bold; color:var(--accent); margin-top:2px;">${realConversion.toFixed(1)}%</div>
+                                </div>
+                                <div style="font-size:11px; color:var(--text-muted); text-align:right;">Plan: ${planConversion.toFixed(0)}%</div>
+                            </div>
+                            <div style="background: rgba(0,0,0,0.2); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.03); display:flex; justify-content:space-between; align-items:center;">
+                                <div>
+                                    <div style="font-size:10px; color:var(--text-muted); text-transform:uppercase;">Eficiencia de Conversión</div>
+                                    <div style="font-size:18px; font-weight:bold; color:var(--primary); margin-top:2px;">${efficiency.toFixed(1)}%</div>
+                                </div>
+                                <div style="font-size:11px; color:var(--text-muted); text-align:right;">Rendimiento</div>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div style="margin-top:15px; border-top:1px solid rgba(255,255,255,0.05); padding-top:10px; display:flex; justify-content:flex-end;">
                         <button class="btn btn-outline btn-sm" onclick="showAppView('advantage')"><i class="ph ph-trend-up"></i> Ir a La Ventaja</button>
                     </div>
@@ -3021,16 +3146,19 @@
                 const points = act.points;
                 const count = completed[name] || 0;
 
+                const nameEscaped = name.replace(/'/g, "\\'");
                 const itemHtml = `
                     <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); border-radius:10px; padding:12px 15px;">
-                        <div>
-                            <div style="font-weight:bold; font-family:'Outfit';">${name}</div>
+                        <div style="cursor:pointer; flex:1;" onclick="openEditActivityModal('${nameEscaped}', ${points})">
+                            <div style="font-weight:bold; font-family:'Outfit'; display:flex; align-items:center; gap:6px;">
+                                ${name} <i class="ph ph-pencil-simple" style="font-size:12px; color:var(--text-muted);"></i>
+                            </div>
                             <div style="font-size:11px; color:var(--text-muted); font-weight:normal;">+${points} ${points === 1 ? 'punto' : 'puntos'} por repetición</div>
                         </div>
                         <div style="display:flex; align-items:center; gap:12px;">
-                            <button class="btn btn-outline" style="padding:5px 10px; min-width:30px; border-radius:6px;" onclick="adjustActivityCount('${name}', -1)">-</button>
+                            <button class="btn btn-outline" style="padding:5px 10px; min-width:30px; border-radius:6px;" onclick="adjustActivityCount('${nameEscaped}', -1)">-</button>
                             <span style="font-size:18px; font-weight:bold; width:20px; text-align:center;">${count}</span>
-                            <button class="btn btn-outline" style="padding:5px 10px; min-width:30px; border-radius:6px;" onclick="adjustActivityCount('${name}', 1)">+</button>
+                            <button class="btn btn-outline" style="padding:5px 10px; min-width:30px; border-radius:6px;" onclick="adjustActivityCount('${nameEscaped}', 1)">+</button>
                         </div>
                     </div>
                 `;
@@ -3267,15 +3395,66 @@
                 .replace(/- (.*?)(?:<br>|$)/g, '• $1<br>');
         }
 
+        let editingActivityName = null;
+
         function showAddActivityModal() {
+            editingActivityName = null;
             document.getElementById('advantage-act-name').value = '';
             document.getElementById('advantage-act-points').value = '1';
             document.getElementById('advantage-modal-title').innerText = "Agregar Disciplina";
+            document.getElementById('btn-delete-advantage-activity').style.display = 'none';
+            document.getElementById('modal-advantage-activity').classList.remove('hidden');
+        }
+
+        function openEditActivityModal(name, points) {
+            editingActivityName = name;
+            document.getElementById('advantage-act-name').value = name;
+            document.getElementById('advantage-act-points').value = points;
+            document.getElementById('advantage-modal-title').innerText = "Editar Disciplina";
+            document.getElementById('btn-delete-advantage-activity').style.display = 'block';
             document.getElementById('modal-advantage-activity').classList.remove('hidden');
         }
 
         function closeActivityModal() {
             document.getElementById('modal-advantage-activity').classList.add('hidden');
+        }
+
+        async function deleteAdvantageActivity() {
+            if (!editingActivityName || !advantagePlan) return;
+            
+            advantagePlan.activities_config = advantagePlan.activities_config.filter(
+                item => item.activity.toLowerCase() !== editingActivityName.toLowerCase()
+            );
+            
+            if (advantageTodayLog && advantageTodayLog.completed_activities) {
+                delete advantageTodayLog.completed_activities[editingActivityName];
+            }
+
+            const userId = window.sellerData.id;
+            try {
+                const todayStr = getTodayIso();
+                await fetch(`/api/slight-edge/log/${userId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        date_str: todayStr,
+                        completed_activities: advantageTodayLog.completed_activities
+                    })
+                });
+
+                const res = await fetch(`/api/slight-edge/plan/${userId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(advantagePlan)
+                });
+                if (res.ok) {
+                    closeActivityModal();
+                    await loadAdvantageData();
+                    await loadDashboardSlightEdge(userId);
+                }
+            } catch (err) {
+                console.error("Error deleting activity:", err);
+            }
         }
 
         async function saveAdvantageActivity() {
@@ -3285,18 +3464,48 @@
             if (!nameInput) return;
             if (!advantagePlan) return;
 
-            const existing = advantagePlan.activities_config.find(item => item.activity.toLowerCase() === nameInput.toLowerCase());
-            if (existing) {
-                existing.points = pointsInput;
+            if (editingActivityName) {
+                const idx = advantagePlan.activities_config.findIndex(
+                    item => item.activity.toLowerCase() === editingActivityName.toLowerCase()
+                );
+                if (idx !== -1) {
+                    const oldName = advantagePlan.activities_config[idx].activity;
+                    advantagePlan.activities_config[idx].activity = nameInput;
+                    advantagePlan.activities_config[idx].points = pointsInput;
+                    
+                    if (oldName !== nameInput && advantageTodayLog && advantageTodayLog.completed_activities) {
+                        if (advantageTodayLog.completed_activities[oldName] !== undefined) {
+                            advantageTodayLog.completed_activities[nameInput] = advantageTodayLog.completed_activities[oldName];
+                            delete advantageTodayLog.completed_activities[oldName];
+                        }
+                    }
+                }
             } else {
-                advantagePlan.activities_config.push({
-                    activity: nameInput,
-                    points: pointsInput
-                });
+                const existing = advantagePlan.activities_config.find(item => item.activity.toLowerCase() === nameInput.toLowerCase());
+                if (existing) {
+                    existing.points = pointsInput;
+                } else {
+                    advantagePlan.activities_config.push({
+                        activity: nameInput,
+                        points: pointsInput
+                    });
+                }
             }
 
             const userId = window.sellerData.id;
             try {
+                if (editingActivityName && editingActivityName !== nameInput && advantageTodayLog) {
+                    const todayStr = getTodayIso();
+                    await fetch(`/api/slight-edge/log/${userId}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            date_str: todayStr,
+                            completed_activities: advantageTodayLog.completed_activities
+                        })
+                    });
+                }
+
                 const res = await fetch(`/api/slight-edge/plan/${userId}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -3305,6 +3514,7 @@
                 if (res.ok) {
                     closeActivityModal();
                     await loadAdvantageData();
+                    await loadDashboardSlightEdge(userId);
                 }
             } catch (err) {
                 console.error("Error saving plan:", err);
