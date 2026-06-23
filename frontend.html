@@ -571,9 +571,6 @@
                 <a class="nav-item" onclick="showAppView('advantage')" id="nav-advantage">
                     <i class="ph ph-trend-up"></i> La Ventaja
                 </a>
-                <a class="nav-item" onclick="showAppView('accountability')" id="nav-accountability" style="display:none;">
-                    <i class="ph ph-check-square"></i> Actividades y Metas
-                </a>
                 <a class="nav-item" onclick="showAppView('settings')" id="nav-settings">
                     <i class="ph ph-gear"></i> Configuración
                 </a>
@@ -648,18 +645,11 @@
 
                 <div class="card glass" style="margin-top: 20px; border-left: 4px solid #6366f1;">
                     <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
-                        <div class="card-title"><i class="ph ph-target"></i> Mis Metas y Estrategia de Venta</div>
-                        <button class="btn" style="font-size: 12px; padding: 6px 12px; background: linear-gradient(135deg, #6366f1, #a855f7); border: none;" onclick="openSellerGoalsWizard()"><i class="ph-fill ph-magic-wand"></i> Asistente de Metas IA</button>
+                        <div class="card-title"><i class="ph ph-trend-up"></i> La Ventaja: Progreso y Consistencia</div>
+                        <button class="btn" style="font-size: 12px; padding: 6px 12px; background: linear-gradient(135deg, #6366f1, #a855f7); border: none;" onclick="showAppView('advantage')"><i class="ph ph-sparkle"></i> Coach IA</button>
                     </div>
-                    <div style="padding: 20px; display: grid; grid-template-columns: 1fr; gap: 15px;">
-                        <div>
-                            <h4 style="color:var(--text-muted); font-size:12px; text-transform:uppercase; letter-spacing:1px; margin-bottom:5px;">Meta de Ventas Activa</h4>
-                            <div id="dash_sales_goals_display" style="font-size: 15px; line-height: 1.6; color: var(--text-main); white-space: pre-wrap; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.05);">Cargando tus metas...</div>
-                        </div>
-                        <div>
-                            <h4 style="color:var(--text-muted); font-size:12px; text-transform:uppercase; letter-spacing:1px; margin-bottom:5px;">Objetivos y Enfoque del Coach</h4>
-                            <div id="dash_objectives_display" style="font-size: 15px; line-height: 1.6; color: var(--text-main); white-space: pre-wrap; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.05);">Cargando objetivos...</div>
-                        </div>
+                    <div style="padding: 20px;" id="dash_slight_edge_display">
+                        <div style="text-align:center; color:var(--text-muted);"><i class="ph ph-spinner ph-spin"></i> Cargando resumen de consistencia...</div>
                     </div>
                 </div>
 
@@ -1592,11 +1582,17 @@
                     // Populate Dashboard Data
                     document.getElementById('dash_name').textContent = data.name || '-';
                     document.getElementById('dash_phone').textContent = data.phone_number || '-';
-                    document.getElementById('dash_role').textContent = data.role === 'vendedor_independiente' ? 'Independiente' : 'Vendedor de Empresa';
+                    
+                    let roleLabel = 'Vendedor';
+                    if (data.role === 'admin' || data.role === 'admin_empresa') roleLabel = 'Coordinador';
+                    else if (data.role === 'vendedor_empresa') roleLabel = 'Vendedor de Empresa';
+                    else if (data.role === 'vendedor_independiente') roleLabel = 'Independiente';
+                    document.getElementById('dash_role').textContent = roleLabel;
+                    
                     document.getElementById('dash_goals').textContent = data.sales_goals || 'No definidas';
                     
-                    document.getElementById('dash_sales_goals_display').textContent = data.sales_goals || 'No se han definido metas todavía. Usa el Asistente de Metas IA para configurar tus objetivos financieros.';
-                    document.getElementById('dash_objectives_display').textContent = data.objectives || 'No se han definido directrices estratégicas. El coach usará esta sección para saber en qué enfocarse y guiar tus actividades semanales.';
+                    // Load Slight Edge Summary
+                    loadDashboardSlightEdge(data.id);
 
                     // Populate Settings Data
                     document.getElementById('set_name').value = data.name || '';
@@ -1665,18 +1661,23 @@
                         btnEl.className = 'btn';
                     }
 
-                    // Check Company Tab visibility
-                    document.getElementById('nav-accountability').style.display = 'flex';
-                    if (data.company_code) {
+                    // Check Company Tab visibility and role-based access
+                    document.getElementById('nav-team').style.display = 'none';
+                    document.getElementById('nav-company').style.display = 'none';
+                    document.getElementById('nav-coordinator').style.display = 'none';
+                    document.getElementById('btn-invite-seller').style.display = 'none';
+
+                    if (data.role === 'admin' || data.role === 'admin_empresa') {
                         document.getElementById('nav-team').style.display = 'flex';
-                        if (data.role === 'admin' || data.role === 'admin_empresa') {
-                            document.getElementById('nav-company').style.display = 'flex';
-                            document.getElementById('nav-coordinator').style.display = 'flex';
-                            document.getElementById('btn-invite-seller').style.display = 'inline-flex';
+                        document.getElementById('nav-company').style.display = 'flex';
+                        document.getElementById('nav-coordinator').style.display = 'flex';
+                        document.getElementById('btn-invite-seller').style.display = 'inline-flex';
+                        if (data.company_code) {
                             loadCoordinatorDashboard(data.company_code);
-                        } else {
-                            document.getElementById('btn-invite-seller').style.display = 'none';
                         }
+                    }
+
+                    if (data.company_code) {
                         loadCompanyData(data.company_code);
                     }
 
@@ -2790,6 +2791,102 @@
         let advantagePlan = null;
         let advantageTodayLog = null;
         let chartSlightEdgeInstance = null;
+
+        async function loadDashboardSlightEdge(userId) {
+            const container = document.getElementById('dash_slight_edge_display');
+            if (!container) return;
+
+            try {
+                const resPlan = await fetch(`/api/slight-edge/plan/${userId}`);
+                if (resPlan.status === 404) {
+                    container.innerHTML = `
+                        <div style="text-align:center; padding: 20px; color:var(--text-muted);">
+                            <p style="margin-bottom:15px;">Aún no has configurado tu plan de La Ventaja con el Coach.</p>
+                            <button class="btn btn-sm" onclick="showAppView('advantage')"><i class="ph ph-sparkle"></i> Configurar Plan de Consistencia</button>
+                        </div>
+                    `;
+                    return;
+                } else if (!resPlan.ok) {
+                    throw new Error("Error loading plan");
+                }
+
+                const plan = await resPlan.json();
+                
+                // Fetch today's log
+                const todayStr = getTodayIso();
+                const resToday = await fetch(`/api/slight-edge/log/${userId}?date_str=${todayStr}`);
+                let todayLog = { total_points: 0, completed_activities: {} };
+                if (resToday.ok) {
+                    todayLog = await resToday.json();
+                }
+
+                // Fetch history for weekly points
+                const resHist = await fetch(`/api/slight-edge/log/${userId}`);
+                let weeklyPoints = 0;
+                if (resHist.ok) {
+                    const logs = await resHist.json();
+                    
+                    // Calculate start of current week (Monday)
+                    const now = new Date();
+                    const day = now.getDay();
+                    const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+                    const monday = new Date(now.setDate(diff));
+                    monday.setHours(0,0,0,0);
+                    
+                    logs.forEach(log => {
+                        const logDate = new Date(log.date + 'T00:00:00');
+                        if (logDate >= monday) {
+                            weeklyPoints += log.total_points || 0;
+                        }
+                    });
+                }
+
+                // Build HTML
+                const dailyGoal = plan.daily_points_goal || 10;
+                const weeklyGoal = dailyGoal * 5; // Monday to Friday (50 points)
+                const completed = todayLog.completed_activities || {};
+                
+                let actsHtml = '';
+                const actList = Object.entries(completed).filter(([_, count]) => count > 0);
+                if (actList.length > 0) {
+                    actsHtml = actList.map(([name, count]) => `
+                        <span style="background:rgba(99,102,241,0.1); border:1px solid rgba(99,102,241,0.2); padding:4px 8px; border-radius:6px; font-size:12px; font-weight:bold;">
+                            ${name}: ${count}
+                        </span>
+                    `).join(' ');
+                } else {
+                    actsHtml = '<span style="color:var(--text-muted); font-size:13px;">Ninguna actividad registrada hoy.</span>';
+                }
+
+                container.innerHTML = `
+                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:20px;">
+                        <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); padding:15px; border-radius:10px; text-align:center;">
+                            <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase; margin-bottom:5px;">PUNTOS HOY</div>
+                            <div style="font-size:28px; font-weight:bold; font-family:'Outfit'; color:var(--primary);">${todayLog.total_points || 0} / ${dailyGoal}</div>
+                            <div style="font-size:12px; color:var(--text-muted); margin-top:5px;">Meta diaria de consistencia</div>
+                        </div>
+                        <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); padding:15px; border-radius:10px; text-align:center;">
+                            <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase; margin-bottom:5px;">PUNTOS ESTA SEMANA</div>
+                            <div style="font-size:28px; font-weight:bold; font-family:'Outfit'; color:var(--accent);">${weeklyPoints} / ${weeklyGoal}</div>
+                            <div style="font-size:12px; color:var(--text-muted); margin-top:5px;">Meta semanal acumulada</div>
+                        </div>
+                    </div>
+                    <div style="margin-top:15px;">
+                        <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase; margin-bottom:8px;">Actividades Completadas Hoy:</div>
+                        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                            ${actsHtml}
+                        </div>
+                    </div>
+                    <div style="margin-top:15px; border-top:1px solid rgba(255,255,255,0.05); padding-top:10px; display:flex; justify-content:flex-end;">
+                        <button class="btn btn-outline btn-sm" onclick="showAppView('advantage')"><i class="ph ph-trend-up"></i> Ir a La Ventaja</button>
+                    </div>
+                `;
+
+            } catch (err) {
+                console.error("Error loading dashboard slight edge summary:", err);
+                container.innerHTML = '<div style="color:var(--danger);">Error al cargar resumen de consistencia.</div>';
+            }
+        }
 
         function getTodayIso() {
             const d = new Date();
