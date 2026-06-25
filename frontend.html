@@ -201,9 +201,107 @@
             --danger: #ff4d4d;
             --success: #00e676;
             
+            /* Shadows & Glows */
+            --primary-shadow: rgba(124, 77, 255, 0.4);
+            --primary-focus: rgba(124, 77, 255, 0.2);
+            --primary-glow: rgba(124, 77, 255, 0.15);
+            
             /* Sizing & Transitions */
             --sidebar-width: 280px;
             --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+
+        body.light-mode {
+            --bg-color: #FFFFFF;
+            --bg-gradient: linear-gradient(145deg, #F8F9FA 0%, #FFFFFF 50%, #E9ECEF 100%);
+            --sidebar-bg: rgba(240, 240, 245, 0.9);
+            --card-bg: rgba(255, 255, 255, 0.95);
+            --card-border: rgba(0, 0, 0, 0.08);
+            --primary: #ff4d4d; /* Rojo */
+            --primary-hover: #e60000;
+            --accent: #000000; /* Negro */
+            --accent-glow: rgba(0, 0, 0, 0.05);
+            --text-main: #000000; /* Negro */
+            --text-muted: #555555;
+            --danger: #d32f2f;
+            --success: #2e7d32;
+            
+            --primary-shadow: rgba(255, 77, 77, 0.3);
+            --primary-focus: rgba(255, 77, 77, 0.15);
+            --primary-glow: rgba(255, 77, 77, 0.1);
+        }
+        
+        /* Light mode selective overrides */
+        body.light-mode input,
+        body.light-mode select,
+        body.light-mode textarea {
+            background: #FFFFFF !important;
+            color: #000000 !important;
+            border: 1px solid rgba(0, 0, 0, 0.15) !important;
+        }
+        
+        body.light-mode input::placeholder,
+        body.light-mode textarea::placeholder {
+            color: #888888 !important;
+        }
+
+        body.light-mode .btn-outline {
+            color: #000000 !important;
+            border-color: rgba(0, 0, 0, 0.2) !important;
+        }
+
+        body.light-mode .btn-outline:hover {
+            background: rgba(0, 0, 0, 0.05) !important;
+        }
+
+        body.light-mode .mobile-bottom-nav {
+            background: rgba(255, 255, 255, 0.95) !important;
+            border-top: 1px solid rgba(0, 0, 0, 0.08) !important;
+        }
+
+        body.light-mode .voice-transcription {
+            background: rgba(0, 0, 0, 0.03) !important;
+            color: #333333 !important;
+        }
+        body.light-mode .voice-status {
+            color: #000000 !important;
+        }
+        body.light-mode .voice-avatar {
+            background: rgba(0, 0, 0, 0.02) !important;
+            border: 1px solid rgba(0, 0, 0, 0.08) !important;
+        }
+        body.light-mode #view-playground.keyboard-mode #chatMsgs {
+            background: rgba(0, 0, 0, 0.03) !important;
+        }
+        body.light-mode .logo-text,
+        body.light-mode .mobile-close-btn,
+        body.light-mode .card-title,
+        body.light-mode .data-value,
+        body.light-mode .chat-input-area input {
+            color: var(--text-main) !important;
+        }
+        body.light-mode .chat-input-area input {
+            background: #FFFFFF !important;
+            border: 1px solid rgba(0, 0, 0, 0.15) !important;
+        }
+        
+        body.light-mode [style*="color: white"], 
+        body.light-mode [style*="color:white"] {
+            color: var(--text-main) !important;
+        }
+        body.light-mode [style*="background: rgba(255,255,255,0.05)"],
+        body.light-mode [style*="background:rgba(255,255,255,0.05)"] {
+            background: rgba(0, 0, 0, 0.05) !important;
+        }
+        body.light-mode [style*="background: rgba(255,255,255,0.02)"],
+        body.light-mode [style*="background:rgba(255,255,255,0.02)"] {
+            background: rgba(0, 0, 0, 0.02) !important;
+        }
+        body.light-mode #new_task_title,
+        body.light-mode #advantage-chat-input {
+            color: #000000 !important;
+            background: #ffffff !important;
+            border: 1px solid rgba(0,0,0,0.15) !important;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -244,7 +342,7 @@
             justify-content: center;
             gap: 8px;
         }
-        .btn:hover { background: var(--primary-hover); transform: translateY(-1px); box-shadow: 0 4px 15px rgba(124, 77, 255, 0.4); }
+        .btn:hover { background: var(--primary-hover); transform: translateY(-1px); box-shadow: 0 4px 15px var(--primary-shadow); }
         .btn-outline {
             background: transparent;
             border: 1px solid var(--card-border);
@@ -253,7 +351,7 @@
         .btn-outline:hover { background: rgba(255,255,255,0.05); }
         .btn-danger { background: rgba(255, 77, 77, 0.1); color: var(--danger); border: 1px solid rgba(255, 77, 77, 0.3); }
         .btn-danger:hover { background: rgba(255, 77, 77, 0.2); box-shadow: none; transform: none; }
-
+ 
         .form-group { margin-bottom: 20px; }
         label { display: block; font-size: 13px; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;}
         input, select, textarea {
@@ -269,7 +367,7 @@
             transition: var(--transition);
             resize: vertical;
         }
-        input:focus, select:focus, textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(124, 77, 255, 0.2); }
+        input:focus, select:focus, textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-focus); }
         
         .alert { padding: 16px; border-radius: 12px; margin-top: 15px; font-size: 14px; display: none; display: flex; align-items: center; gap: 10px; }
         .alert i { font-size: 20px; }
@@ -340,7 +438,7 @@
         }
         .nav-item i { font-size: 22px; }
         .nav-item:hover { color: var(--text-main); background: rgba(255,255,255,0.03); }
-        .nav-item.active { background: rgba(124, 77, 255, 0.15); color: var(--primary); border-left: 3px solid var(--primary); }
+        .nav-item.active { background: var(--primary-glow); color: var(--primary); border-left: 3px solid var(--primary); }
         
         .sidebar-footer {
             padding: 20px;
@@ -1014,9 +1112,14 @@
                         <h4 id="user-profile-name">Cargando...</h4>
                         <p id="user-profile-email">email@google.com</p>
                     </div>
-                    <button onclick="showAppView('settings')" style="background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center; margin-left: auto;" title="Configuración de Cuenta">
-                        <i class="ph ph-gear" style="font-size: 20px;"></i>
-                    </button>
+                    <div style="display:flex; gap:8px; margin-left:auto; align-items:center;">
+                        <button onclick="toggleTheme()" style="background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center;" title="Cambiar Tema">
+                            <i class="ph ph-sun" id="theme-btn-icon-desktop" style="font-size: 20px;"></i>
+                        </button>
+                        <button onclick="showAppView('settings')" style="background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center;" title="Configuración de Cuenta">
+                            <i class="ph ph-gear" style="font-size: 20px;"></i>
+                        </button>
+                    </div>
                 </div>
                 <button class="btn btn-outline btn-danger" style="width:100%; padding: 10px;" onclick="window.firebaseLogout()">
                     <i class="ph ph-sign-out"></i> Cerrar Sesión
@@ -1029,9 +1132,14 @@
             <div class="mobile-header">
                 <div class="logo-text" style="font-size: 18px;"><i class="ph-fill ph-robot" style="color:var(--accent)"></i> Sales Coach</div>
                 <button class="mobile-menu-btn" onclick="toggleSidebar()"><i class="ph ph-list"></i></button>
-                <button class="mobile-logout-btn" onclick="window.firebaseLogout()" title="Cerrar Sesión">
-                    <i class="ph ph-sign-out"></i>
-                </button>
+                <div style="display:flex; gap:12px; align-items:center;">
+                    <button onclick="toggleTheme()" class="mobile-theme-btn" title="Cambiar Tema" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:20px; padding:4px; display:flex; align-items:center; justify-content:center;">
+                        <i class="ph ph-sun" id="theme-btn-icon-mobile"></i>
+                    </button>
+                    <button class="mobile-logout-btn" onclick="window.firebaseLogout()" title="Cerrar Sesión">
+                        <i class="ph ph-sign-out"></i>
+                    </button>
+                </div>
             </div>
             
             <main class="content-area">
@@ -1992,6 +2100,46 @@
 
     <!-- LOGIC -->
     <script>
+        function initTheme() {
+            const savedTheme = localStorage.getItem('theme') || 'dark';
+            if (savedTheme === 'light') {
+                document.body.classList.add('light-mode');
+                updateThemeIcons('light');
+            } else {
+                document.body.classList.remove('light-mode');
+                updateThemeIcons('dark');
+            }
+        }
+
+        function toggleTheme() {
+            const isLight = document.body.classList.contains('light-mode');
+            if (isLight) {
+                document.body.classList.remove('light-mode');
+                localStorage.setItem('theme', 'dark');
+                updateThemeIcons('dark');
+            } else {
+                document.body.classList.add('light-mode');
+                localStorage.setItem('theme', 'light');
+                updateThemeIcons('light');
+            }
+        }
+
+        function updateThemeIcons(theme) {
+            const iconMobile = document.getElementById('theme-btn-icon-mobile');
+            const iconDesktop = document.getElementById('theme-btn-icon-desktop');
+            
+            // "Usa los íconos de Luna/Sol"
+            // If theme is light, show Moon icon (since clicking it will switch to dark)
+            // If theme is dark, show Sun icon (since clicking it will switch to light)
+            const iconClass = theme === 'light' ? 'ph ph-moon' : 'ph ph-sun';
+            
+            if (iconMobile) iconMobile.className = iconClass;
+            if (iconDesktop) iconDesktop.className = iconClass;
+        }
+
+        // Initialize theme immediately
+        initTheme();
+        window.addEventListener('DOMContentLoaded', initTheme);
         function isMobileDevice() {
             return (window.innerWidth <= 768) || 
                    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -4483,9 +4631,9 @@
             const bubble = document.createElement('div');
             
             if (role === 'user') {
-                bubble.style.cssText = "align-self: flex-end; background: linear-gradient(135deg, #6366f1, #a855f7); color: white; padding: 12px 16px; border-radius: 12px 12px 0 12px; max-width: 80%; line-height: 1.4; box-shadow: 0 4px 15px rgba(99, 102, 241, 0.2);";
+                bubble.style.cssText = "align-self: flex-end; background: var(--primary); color: white; padding: 12px 16px; border-radius: 12px 12px 0 12px; max-width: 80%; line-height: 1.4; box-shadow: 0 4px 15px var(--primary-focus);";
             } else if (role === 'agent') {
-                bubble.style.cssText = "align-self: flex-start; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 12px 16px; border-radius: 12px 12px 12px 0; max-width: 80%; line-height: 1.4;";
+                bubble.style.cssText = "align-self: flex-start; background: var(--card-bg); border: 1px solid var(--card-border); color: var(--text-main); padding: 12px 16px; border-radius: 12px 12px 12px 0; max-width: 80%; line-height: 1.4;";
             } else {
                 bubble.style.cssText = "align-self: center; color: var(--text-muted); font-size:12px; max-width: 100%;";
             }
