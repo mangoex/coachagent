@@ -2437,6 +2437,18 @@
             const utterance = new SpeechSynthesisUtterance(cleaned);
             utterance.lang = 'es-MX';
             
+            // Try to assign a Spanish voice from the browser's available voices
+            if (window.speechSynthesis.getVoices) {
+                const voices = window.speechSynthesis.getVoices();
+                let voice = voices.find(v => v.lang === 'es-MX' || v.lang === 'es_MX');
+                if (!voice) {
+                    voice = voices.find(v => v.lang.startsWith('es-') || v.lang.startsWith('es_') || v.lang === 'es');
+                }
+                if (voice) {
+                    utterance.voice = voice;
+                }
+            }
+            
             // When TTS ends, if in mobile voice-mode, automatically start recording again
             utterance.onend = () => {
                 const playground = document.getElementById('view-playground');
@@ -2527,7 +2539,20 @@
             if (inputEl) inputEl.placeholder = "Escribe tu instrucción aquí...";
         }
 
+        function unlockSpeechSynthesis() {
+            if (window.speechSynthesis) {
+                try {
+                    const u = new SpeechSynthesisUtterance("");
+                    u.volume = 0;
+                    window.speechSynthesis.speak(u);
+                } catch(e) {
+                    console.warn("Failed to unlock speech synthesis:", e);
+                }
+            }
+        }
+
         function togglePlaygroundVoiceCapture() {
+            unlockSpeechSynthesis();
             if (!playgroundRecognition) initPlaygroundSpeech();
             if (!playgroundRecognition) {
                 alert("Tu dispositivo no soporta reconocimiento de voz.");
@@ -2586,6 +2611,7 @@
         }
 
         function toggleAdvantageVoiceCapture() {
+            unlockSpeechSynthesis();
             if (!advantageRecognition) initAdvantageSpeech();
             if (!advantageRecognition) {
                 alert("Tu dispositivo no soporta reconocimiento de voz.");
