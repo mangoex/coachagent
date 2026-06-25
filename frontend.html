@@ -821,6 +821,33 @@
             100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
         }
 
+        /* Mobile Mode Class Rules */
+        body.mobile-mode .mobile-menu-btn { display: none !important; }
+        body.mobile-mode .sidebar-overlay { display: none !important; }
+        body.mobile-mode aside#sidebar { display: none !important; }
+        body.mobile-mode .mobile-logout-btn { display: block !important; background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 20px; padding: 4px; transition: var(--transition); }
+        body.mobile-mode .mobile-logout-btn:hover { color: var(--danger); }
+        body.mobile-mode .mobile-bottom-nav { display: flex !important; position: fixed; bottom: 0; left: 0; right: 0; height: 65px; background: rgba(15, 12, 32, 0.95); backdrop-filter: blur(10px); border-top: 1px solid rgba(255, 255, 255, 0.08); z-index: 999; justify-content: space-around; align-items: center; }
+        body.mobile-mode .mobile-nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-muted); text-decoration: none; font-size: 11px; gap: 4px; flex: 1; height: 100%; transition: var(--transition); }
+        body.mobile-mode .mobile-nav-item i { font-size: 20px; }
+        body.mobile-mode .mobile-nav-item.active { color: var(--accent); }
+        body.mobile-mode main.content-area { padding-bottom: 85px !important; }
+        body.mobile-mode #view-playground .page-header { display: none !important; }
+        body.mobile-mode #view-playground .chat-header { display: none !important; }
+        body.mobile-mode #view-playground #chatMsgs { display: none !important; }
+        body.mobile-mode #view-playground #chatText { display: none !important; }
+        body.mobile-mode #view-playground .btn-send { display: none !important; }
+        body.mobile-mode #view-playground .chat-container { background: transparent !important; border: none !important; height: calc(100vh - 220px) !important; display: flex !important; flex-direction: column !important; justify-content: space-between !important; align-items: center !important; padding: 20px 10px !important; }
+        body.mobile-mode #view-playground .chat-input-area { border: none !important; background: transparent !important; display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; gap: 15px !important; width: 100% !important; padding: 20px 0 !important; }
+        body.mobile-mode #playground-mic-btn { display: flex !important; width: 110px !important; height: 110px !important; font-size: 40px !important; background: linear-gradient(135deg, var(--primary), var(--secondary)) !important; border: none !important; box-shadow: 0 8px 30px rgba(99, 102, 241, 0.4) !important; order: 1; }
+        body.mobile-mode #playground-audio-btn { display: flex !important; order: 2; font-size: 20px !important; color: var(--text-muted); }
+        body.mobile-mode .mobile-voice-feedback { display: flex !important; flex-direction: column; align-items: center; justify-content: center; text-align: center; flex: 1; gap: 24px; width: 100%; max-width: 320px; margin: auto; }
+        body.mobile-mode .voice-avatar { position: relative; width: 80px; height: 80px; border-radius: 50%; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); display: flex; align-items: center; justify-content: center; }
+        body.mobile-mode .voice-avatar i { font-size: 40px; color: var(--accent); }
+        body.mobile-mode .voice-status { font-family: 'Outfit', sans-serif; font-size: 18px; font-weight: 500; color: #fff; }
+        body.mobile-mode .voice-transcription { font-size: 14px; color: var(--text-muted); line-height: 1.5; min-height: 50px; padding: 10px; border-radius: 12px; background: rgba(255, 255, 255, 0.02); width: 100%; box-sizing: border-box; font-style: italic; }
+        body.mobile-mode #playground-mic-btn.recording { background: var(--danger) !important; box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7) !important; animation: pulse-ring-mic 1.5s infinite !important; }
+
     </style>
 </head>
 <body>
@@ -1917,6 +1944,23 @@
 
     <!-- LOGIC -->
     <script>
+        function isMobileDevice() {
+            return (window.innerWidth <= 768) || 
+                   /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        }
+
+        function updateMobileClass() {
+            if (isMobileDevice()) {
+                document.body.classList.add('mobile-mode');
+            } else {
+                document.body.classList.remove('mobile-mode');
+            }
+        }
+        
+        window.addEventListener('resize', updateMobileClass);
+        window.addEventListener('DOMContentLoaded', updateMobileClass);
+        updateMobileClass();
+
         function setAppMode(mode) {
             document.getElementById('screen-login').classList.add('hidden');
             document.getElementById('screen-onboarding').classList.add('hidden');
@@ -1927,8 +1971,10 @@
             else if(mode === 'app') {
                 document.getElementById('screen-app').classList.remove('hidden');
                 
+                updateMobileClass();
+                
                 // If on mobile, default view should be La Ventaja
-                if (window.innerWidth <= 768) {
+                if (isMobileDevice()) {
                     const activePanel = document.querySelector('.view-panel.active');
                     if (!activePanel || (activePanel.id !== 'view-advantage' && activePanel.id !== 'view-playground')) {
                         showAppView('advantage');
