@@ -54,6 +54,47 @@ def get_slight_edge_plan(user_id: int, db: Session = Depends(get_db)):
     plan = db.query(SlightEdgePlan).filter(SlightEdgePlan.user_id == user_id).first()
     if not plan:
         raise HTTPException(status_code=404, detail="No se encontró un plan de La Ventaja para este usuario.")
+    
+    # Calculate actual stats for the current month (start of current month to today)
+    today_dt = date.today()
+    start_month = today_dt.replace(day=1)
+    
+    logs = db.query(SlightEdgeLog).filter(
+        SlightEdgeLog.user_id == user_id,
+        SlightEdgeLog.date >= start_month
+    ).all()
+    
+    def categorize_activity(name: str) -> str:
+        n = name.lower().strip()
+        if any(x in n for x in ["llam", "call", "prospect"]):
+            return "llamada"
+        if any(x in n for x in ["cit", "reun", "meet"]):
+            return "cita"
+        if any(x in n for x in ["cotiz", "propuest", "presupuest", "quot"]):
+            return "cotizacion"
+        if any(x in n for x in ["cierr", "vent", "cobro", "clos"]):
+            return "venta"
+        return "otra"
+
+    actual_calls = 0
+    actual_meetings = 0
+    actual_quotes = 0
+    actual_sales = 0
+    
+    for log in logs:
+        comp = log.completed_activities or {}
+        for act_name, count in comp.items():
+            cat = categorize_activity(act_name)
+            val = max(0, count)
+            if cat == "llamada":
+                actual_calls += val
+            elif cat == "cita":
+                actual_meetings += val
+            elif cat == "cotizacion":
+                actual_quotes += val
+            elif cat == "venta":
+                actual_sales += val
+                
     return {
         "id": plan.id,
         "user_id": plan.user_id,
@@ -61,6 +102,12 @@ def get_slight_edge_plan(user_id: int, db: Session = Depends(get_db)):
         "ticket_average": plan.ticket_average,
         "conversion_rate": plan.conversion_rate,
         "funnel_metrics": plan.funnel_metrics,
+        "actual_metrics": {
+            "sales": actual_sales,
+            "quotes": actual_quotes,
+            "meetings": actual_meetings,
+            "calls": actual_calls
+        },
         "activities_config": plan.activities_config,
         "daily_points_goal": plan.daily_points_goal,
         "created_at": plan.created_at,

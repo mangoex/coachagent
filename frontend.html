@@ -489,6 +489,60 @@
             .auth-card { padding: 30px 20px; }
         }
 
+        /* Custom switch toggle for the funnel card */
+        .switch-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--text-muted);
+            cursor: pointer;
+            user-select: none;
+        }
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 38px;
+            height: 20px;
+        }
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            transition: .3s;
+            border-radius: 20px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 12px;
+            width: 12px;
+            left: 3px;
+            bottom: 3px;
+            background-color: var(--text-main);
+            transition: .3s;
+            border-radius: 50%;
+        }
+        .switch input:checked + .slider {
+            background-color: var(--accent);
+            border-color: var(--accent);
+            box-shadow: 0 0 8px var(--accent-glow);
+        }
+        .switch input:checked + .slider:before {
+            transform: translateX(18px);
+            background-color: #0b0914; /* contrast dark color on active state */
+        }
+
     </style>
 </head>
 <body>
@@ -1299,8 +1353,15 @@
 
                         <!-- Funnel Config Card -->
                         <div class="card glass" style="padding: 20px;">
-                            <div class="card-header">
+                            <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
                                 <div class="card-title"><i class="ph ph-funnel" style="color:var(--accent);"></i> Tu Embudo de Ventas Estimado</div>
+                                <label class="switch-container">
+                                    <span>Valor Real</span>
+                                    <span class="switch">
+                                        <input type="checkbox" id="funnel-toggle-actual" onchange="toggleFunnelMode()">
+                                        <span class="slider"></span>
+                                    </span>
+                                </label>
                             </div>
                             <div style="padding: 10px; display:flex; flex-direction:column; gap:12px;" id="advantage-funnel-container">
                                 <!-- Funnel figures -->
@@ -3349,25 +3410,35 @@
             `;
 
             if (metrics) {
+                const showActual = document.getElementById('funnel-toggle-actual')?.checked || false;
+                
+                const salesVal = showActual ? (advantagePlan.actual_metrics?.sales || 0) : (metrics.sales_needed || 0);
+                const quotesVal = showActual ? (advantagePlan.actual_metrics?.quotes || 0) : (metrics.quotes_needed || 0);
+                const meetingsVal = showActual ? (advantagePlan.actual_metrics?.meetings || 0) : (metrics.meetings_needed || 0);
+                const callsVal = showActual ? (advantagePlan.actual_metrics?.calls || 0) : (metrics.calls_needed || 0);
+                
+                const sectionTitle = showActual ? "Resultados Reales del Mes" : "Metas del Funnel Calculadas";
+                const numColor = showActual ? "var(--accent)" : "white";
+
                 html += `
                     <div style="margin-top: 10px; background: rgba(255,255,255,0.02); border-radius: 8px; padding: 10px;">
-                        <h5 style="margin-bottom:8px; font-size:12px; color:var(--text-muted); text-transform:uppercase;">Metas del Funnel Calculadas</h5>
+                        <h5 style="margin-bottom:8px; font-size:12px; color:var(--text-muted); text-transform:uppercase;">${sectionTitle}</h5>
                         <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:8px;">
                             <div style="border-right: 1px solid rgba(255,255,255,0.05); padding-right:5px;">
                                 <div style="font-size:10px; color:var(--text-muted);">Cierres/Mes</div>
-                                <div style="font-size:16px; font-weight:bold; color:white;">${metrics.sales_needed || 0}</div>
+                                <div style="font-size:16px; font-weight:bold; color:${numColor};">${salesVal}</div>
                             </div>
                             <div style="padding-left:5px;">
                                 <div style="font-size:10px; color:var(--text-muted);">Cotizaciones/Mes</div>
-                                <div style="font-size:16px; font-weight:bold; color:white;">${metrics.quotes_needed || 0}</div>
+                                <div style="font-size:16px; font-weight:bold; color:${numColor};">${quotesVal}</div>
                             </div>
                             <div style="border-right: 1px solid rgba(255,255,255,0.05); padding-right:5px; border-top:1px solid rgba(255,255,255,0.05); padding-top:5px;">
                                 <div style="font-size:10px; color:var(--text-muted);">Citas/Mes</div>
-                                <div style="font-size:16px; font-weight:bold; color:white;">${metrics.meetings_needed || 0}</div>
+                                <div style="font-size:16px; font-weight:bold; color:${numColor};">${meetingsVal}</div>
                             </div>
                             <div style="padding-left:5px; border-top:1px solid rgba(255,255,255,0.05); padding-top:5px;">
                                 <div style="font-size:10px; color:var(--text-muted);">Llamadas/Mes</div>
-                                <div style="font-size:16px; font-weight:bold; color:white;">${metrics.calls_needed || 0}</div>
+                                <div style="font-size:16px; font-weight:bold; color:${numColor};">${callsVal}</div>
                             </div>
                         </div>
                     </div>
@@ -3375,6 +3446,16 @@
             }
             
             container.innerHTML = html;
+        }
+
+        function toggleFunnelMode() {
+            if (!advantagePlan) return;
+            renderFunnelMetrics(
+                advantagePlan.funnel_metrics,
+                advantagePlan.monthly_income_goal,
+                advantagePlan.ticket_average,
+                advantagePlan.conversion_rate
+            );
         }
 
         function renderAdvantageChecklist() {
