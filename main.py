@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 # Try to initialize Firebase Admin (will fail gracefully if no credentials exist)
 try:
-    firebase_admin.initialize_app()
+    firebase_admin.initialize_app(options={'projectId': 'coachagent-ebcd7'})
 except ValueError:
     pass
 except Exception as e:
