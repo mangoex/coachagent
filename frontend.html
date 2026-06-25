@@ -33,10 +33,11 @@
             auth = getAuth(app);
             provider = new GoogleAuthProvider();
             provider.setCustomParameters({ prompt: 'select_account' });
-            // Request scopes for Google Drive/Docs/Sheets/Calendar
+            // Request scopes for Google Drive/Docs/Sheets/Calendar/Tasks
             provider.addScope('https://www.googleapis.com/auth/calendar');
             provider.addScope('https://www.googleapis.com/auth/spreadsheets');
             provider.addScope('https://www.googleapis.com/auth/drive');
+            provider.addScope('https://www.googleapis.com/auth/tasks');
 
             // Intercept window.fetch to automatically include Firebase ID token
             const originalFetch = window.fetch;
@@ -140,15 +141,19 @@
             }
             
             const email = window.currentUser.email;
-            const width = 600;
-            const height = 650;
-            const left = (screen.width - width) / 2;
-            const top = (screen.height - height) / 2;
             
             try {
-                // Open backend OAuth link in a popup window
+                const res = await fetch(`/auth/google/url?email=${encodeURIComponent(email)}`);
+                if (!res.ok) throw new Error("No se pudo obtener la URL de autenticación.");
+                const data = await res.json();
+                
+                const width = 600;
+                const height = 650;
+                const left = (screen.width - width) / 2;
+                const top = (screen.height - height) / 2;
+                
                 const authWindow = window.open(
-                    `/auth/google/url?email=${encodeURIComponent(email)}`,
+                    data.url,
                     "Conectar Google Workspace",
                     `width=${width},height=${height},top=${top},left=${left}`
                 );
