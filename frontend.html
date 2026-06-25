@@ -990,6 +990,173 @@
         body.mobile-mode .voice-transcription { font-size: 14px; color: var(--text-muted); line-height: 1.5; min-height: 50px; padding: 10px; border-radius: 12px; background: rgba(255, 255, 255, 0.02); width: 100%; box-sizing: border-box; font-style: italic; }
         body.mobile-mode #playground-mic-btn.recording { background: var(--danger) !important; box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7) !important; animation: pulse-ring-mic 1.5s infinite !important; }
 
+        /* Checklist de Disciplinas Diarias - Desktop Default Styles */
+        .checklist-item-wrapper {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255,255,255,0.02);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 10px;
+            padding: 12px 15px;
+            transition: var(--transition);
+        }
+        body.light-mode .checklist-item-wrapper {
+            background: rgba(0, 0, 0, 0.02);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+        .checklist-item-info {
+            cursor: pointer;
+            flex: 1;
+        }
+        .checklist-item-title {
+            font-weight: bold;
+            font-family: 'Outfit', sans-serif;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--text-main);
+        }
+        .checklist-item-subtitle {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-weight: normal;
+            margin-top: 2px;
+        }
+        .checklist-item-controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .btn-adjust {
+            background: none;
+            border: 1px solid var(--card-border);
+            color: var(--text-main);
+            padding: 5px 10px;
+            min-width: 30px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        .btn-adjust:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        body.light-mode .btn-adjust {
+            border-color: rgba(0, 0, 0, 0.15) !important;
+            color: #000000 !important;
+        }
+        body.light-mode .btn-adjust:hover {
+            background: rgba(0, 0, 0, 0.05);
+        }
+        .count-display {
+            font-size: 18px;
+            font-weight: bold;
+            width: 20px;
+            text-align: center;
+            color: var(--text-main);
+        }
+
+        /* Checklist de Disciplinas Diarias - Mobile Responsive Overrides */
+        @media (max-width: 768px) {
+            .checklist-item-wrapper {
+                flex-direction: column !important;
+                gap: 12px !important;
+                background: rgba(255, 255, 255, 0.03) !important;
+                border: 1px solid rgba(255, 255, 255, 0.08) !important;
+                border-radius: 14px !important;
+                padding: 16px !important;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+            }
+            body.light-mode .checklist-item-wrapper {
+                background: #fdfdfd !important;
+                border: 1px solid rgba(0, 0, 0, 0.08) !important;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05) !important;
+            }
+            .checklist-item-info {
+                display: flex !important;
+                justify-content: space-between !important;
+                align-items: center !important;
+                width: 100% !important;
+            }
+            .checklist-item-title {
+                font-size: 15px !important;
+            }
+            .checklist-item-subtitle {
+                background: rgba(124, 77, 255, 0.12) !important;
+                color: var(--primary) !important;
+                border: 1px solid rgba(124, 77, 255, 0.25) !important;
+                border-radius: 8px !important;
+                padding: 4px 8px !important;
+                font-size: 11px !important;
+                font-weight: 700 !important;
+                font-family: 'Outfit', sans-serif !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                gap: 4px !important;
+                margin-top: 0 !important;
+            }
+            body.light-mode .checklist-item-subtitle {
+                background: rgba(255, 77, 77, 0.1) !important;
+                color: var(--primary) !important;
+                border: 1px solid rgba(255, 77, 77, 0.2) !important;
+            }
+            .checklist-item-controls {
+                display: flex !important;
+                justify-content: space-between !important;
+                align-items: center !important;
+                background: rgba(255, 255, 255, 0.02) !important;
+                border: 1px solid rgba(255, 255, 255, 0.05) !important;
+                border-radius: 10px !important;
+                padding: 6px 12px !important;
+                width: 100% !important;
+                gap: 0 !important;
+            }
+            body.light-mode .checklist-item-controls {
+                background: rgba(0, 0, 0, 0.02) !important;
+                border: 1px solid rgba(0, 0, 0, 0.04) !important;
+            }
+            .btn-adjust {
+                width: 44px !important;
+                height: 44px !important;
+                border-radius: 50% !important;
+                border: none !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                font-size: 20px !important;
+                font-weight: 600 !important;
+                cursor: pointer !important;
+                outline: none !important;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.1) !important;
+            }
+            .btn-adjust.btn-down {
+                background: rgba(255, 255, 255, 0.07) !important;
+                color: var(--text-muted) !important;
+                border: 1px solid rgba(255, 255, 255, 0.15) !important;
+            }
+            body.light-mode .btn-adjust.btn-down {
+                background: #f0f0f5 !important;
+                color: #555555 !important;
+                border: 1px solid rgba(0, 0, 0, 0.06) !important;
+            }
+            .btn-adjust.btn-up {
+                background: var(--primary) !important;
+                color: white !important;
+            }
+            .btn-adjust:active {
+                transform: scale(0.9) !important;
+            }
+            .count-display {
+                font-size: 24px !important;
+                font-weight: 800 !important;
+                font-family: 'Outfit', sans-serif !important;
+                color: var(--text-main) !important;
+                min-width: 60px !important;
+                text-align: center !important;
+                letter-spacing: -0.5px !important;
+                width: auto !important;
+            }
+        }
     </style>
 </head>
 <body>
@@ -4536,17 +4703,17 @@
 
                 const nameEscaped = name.replace(/'/g, "\\'");
                 const itemHtml = `
-                    <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); border-radius:10px; padding:12px 15px;">
-                        <div style="cursor:pointer; flex:1;" onclick="openEditActivityModal('${nameEscaped}', ${points})">
-                            <div style="font-weight:bold; font-family:'Outfit'; display:flex; align-items:center; gap:6px;">
+                    <div class="checklist-item-wrapper">
+                        <div class="checklist-item-info" onclick="openEditActivityModal('${nameEscaped}', ${points})">
+                            <div class="checklist-item-title">
                                 ${name} <i class="ph ph-pencil-simple" style="font-size:12px; color:var(--text-muted);"></i>
                             </div>
-                            <div style="font-size:11px; color:var(--text-muted); font-weight:normal;">+${points} ${points === 1 ? 'punto' : 'puntos'} por repetición</div>
+                            <div class="checklist-item-subtitle">+${points} ${points === 1 ? 'punto' : 'puntos'} por repetición</div>
                         </div>
-                        <div style="display:flex; align-items:center; gap:12px;">
-                            <button class="btn btn-outline" style="padding:5px 10px; min-width:30px; border-radius:6px;" onclick="adjustActivityCount('${nameEscaped}', -1)">-</button>
-                            <span style="font-size:18px; font-weight:bold; width:20px; text-align:center;">${count}</span>
-                            <button class="btn btn-outline" style="padding:5px 10px; min-width:30px; border-radius:6px;" onclick="adjustActivityCount('${nameEscaped}', 1)">+</button>
+                        <div class="checklist-item-controls">
+                            <button class="btn-adjust btn-down" onclick="adjustActivityCount('${nameEscaped}', -1)">-</button>
+                            <span class="count-display">${count}</span>
+                            <button class="btn-adjust btn-up" onclick="adjustActivityCount('${nameEscaped}', 1)">+</button>
                         </div>
                     </div>
                 `;
