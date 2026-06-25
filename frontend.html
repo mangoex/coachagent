@@ -1083,8 +1083,9 @@
                 <button class="mobile-close-btn" onclick="toggleSidebar()"><i class="ph ph-x"></i></button>
             </div>
             <nav class="nav-menu">
-                <a class="nav-item active" onclick="showAppView('dashboard')" id="nav-dashboard">
+                <a class="nav-item active" onclick="showAppView('dashboard')" id="nav-dashboard" style="position: relative;">
                     <i class="ph ph-squares-four"></i> Mi Panel
+                    <span id="badge-dashboard" class="nav-badge" style="display: none; background: var(--primary); color: white; border-radius: 10px; padding: 2px 6px; font-size: 11px; font-weight: bold; position: absolute; right: 18px; top: 50%; transform: translateY(-50%); box-shadow: 0 0 5px var(--primary-shadow);">0</span>
                 </a>
                 <a class="nav-item" onclick="showAppView('playground')" id="nav-playground">
                     <i class="ph ph-chat-teardrop-text"></i> Playground
@@ -1133,6 +1134,10 @@
                 <div class="logo-text" style="font-size: 18px;"><i class="ph-fill ph-robot" style="color:var(--accent)"></i> Sales Coach</div>
                 <button class="mobile-menu-btn" onclick="toggleSidebar()"><i class="ph ph-list"></i></button>
                 <div style="display:flex; gap:12px; align-items:center;">
+                    <button onclick="handleNotificationBellClick()" class="mobile-notify-btn" title="Notificaciones" style="position: relative; background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:20px; padding:4px; display:flex; align-items:center; justify-content:center;">
+                        <i class="ph ph-bell"></i>
+                        <span id="badge-mobile" style="display: none; background: var(--primary); color: white; border-radius: 10px; padding: 1px 5px; font-size: 9px; font-weight: bold; position: absolute; top: -2px; right: -2px; min-width: 14px; height: 14px; text-align: center; line-height: 12px; box-shadow: 0 0 5px var(--primary-shadow);">0</span>
+                    </button>
                     <button onclick="toggleTheme()" class="mobile-theme-btn" title="Cambiar Tema" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:20px; padding:4px; display:flex; align-items:center; justify-content:center;">
                         <i class="ph ph-sun" id="theme-btn-icon-mobile"></i>
                     </button>
@@ -2137,9 +2142,105 @@
             if (iconDesktop) iconDesktop.className = iconClass;
         }
 
+        // Notification & Badge globals
+        let globalTasksCount = 0;
+        let globalEventsCount = 0;
+        let lastTotalCount = null;
+
+        function initBrowserNotifications() {
+            if ("Notification" in window) {
+                console.log("Browser Notifications supported. Permission status:", Notification.permission);
+            }
+        }
+
+        function sendBrowserNotification(title, body) {
+            if ("Notification" in window && Notification.permission === "granted") {
+                try {
+                    new Notification(title, {
+                        body: body,
+                        icon: "/favicon.ico"
+                    });
+                } catch (e) {
+                    console.error("Error sending desktop notification:", e);
+                }
+            }
+        }
+
+        function updateNotificationBadges() {
+            const total = globalTasksCount + globalEventsCount;
+            
+            // 1. Tab title bubble
+            if (total > 0) {
+                document.title = `(${total}) Sales Coach`;
+            } else {
+                document.title = "Sales Coach";
+            }
+            
+            // 2. Sidebar badge
+            const sidebarBadge = document.getElementById('badge-dashboard');
+            if (sidebarBadge) {
+                if (total > 0) {
+                    sidebarBadge.textContent = total;
+                    sidebarBadge.style.display = 'block';
+                } else {
+                    sidebarBadge.style.display = 'none';
+                }
+            }
+            
+            // 3. Mobile Header Badge
+            const mobileBadge = document.getElementById('badge-mobile');
+            if (mobileBadge) {
+                if (total > 0) {
+                    mobileBadge.textContent = total;
+                    mobileBadge.style.display = 'block';
+                } else {
+                    mobileBadge.style.display = 'none';
+                }
+            }
+            
+            // 4. Send OS/browser notification if count increased
+            if (lastTotalCount !== null && total > lastTotalCount) {
+                let msg = `Tienes ${globalTasksCount} tareas pendientes`;
+                if (globalEventsCount > 0) {
+                    msg += ` y ${globalEventsCount} citas para hoy.`;
+                } else {
+                    msg += `.`;
+                }
+                sendBrowserNotification("Actualización de Pendientes", msg);
+            }
+            lastTotalCount = total;
+        }
+
+        function handleNotificationBellClick() {
+            if ("Notification" in window) {
+                if (Notification.permission === "default") {
+                    Notification.requestPermission().then(permission => {
+                        if (permission === "granted") {
+                            sendBrowserNotification("¡Notificaciones Activas!", "Ahora recibirás avisos sobre tus citas y pendientes de hoy.");
+                        }
+                    });
+                }
+            }
+            showAppView('dashboard');
+        }
+
+        function startBackgroundPolling() {
+            // Poll silently every 5 minutes (300000ms)
+            setInterval(() => {
+                if (window.sellerData && window.sellerData.is_google_connected) {
+                    loadUpcomingEvents(window.sellerData.id, true);
+                    loadGoogleTasks(true);
+                }
+            }, 300000);
+        }
+
         // Initialize theme immediately
         initTheme();
-        window.addEventListener('DOMContentLoaded', initTheme);
+        window.addEventListener('DOMContentLoaded', () => {
+            initTheme();
+            initBrowserNotifications();
+            startBackgroundPolling();
+        });
         function isMobileDevice() {
             return (window.innerWidth <= 768) || 
                    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -2966,14 +3067,18 @@
             setTimeout(() => { document.getElementById('settingsAlert').style.display='none'; }, 3000);
         }
 
-        async function loadUpcomingEvents(userId) {
+        async function loadUpcomingEvents(userId, silent = false) {
             const container = document.getElementById('dash_upcoming_events');
             if(!container) return;
-            container.innerHTML = '<div style="text-align:center; color:var(--text-muted);"><i class="ph ph-spinner ph-spin"></i> Cargando agenda...</div>';
+            if (!silent) {
+                container.innerHTML = '<div style="text-align:center; color:var(--text-muted);"><i class="ph ph-spinner ph-spin"></i> Cargando agenda...</div>';
+            }
             
             const targetId = userId || (window.sellerData ? window.sellerData.id : null);
             if (!targetId) {
-                container.innerHTML = '<div style="text-align:center; color:var(--warning); padding:10px;">ID de usuario no disponible.</div>';
+                if (!silent) {
+                    container.innerHTML = '<div style="text-align:center; color:var(--warning); padding:10px;">ID de usuario no disponible.</div>';
+                }
                 return;
             }
 
@@ -2982,11 +3087,20 @@
                 if (res.ok) {
                     const data = await res.json();
                     if (data.error) {
-                        container.innerHTML = `<div style="text-align:center; color:var(--warning); padding:10px;"><i class="ph ph-warning-circle"></i> ${data.error}</div>`;
+                        if (!silent) {
+                            container.innerHTML = `<div style="text-align:center; color:var(--warning); padding:10px;"><i class="ph ph-warning-circle"></i> ${data.error}</div>`;
+                        }
                         return;
                     }
                     
                     const events = data.events || [];
+                    
+                    // Filter today's events for notification count
+                    const todayStr = new Date().toDateString();
+                    const todayEvents = events.filter(ev => ev.start && new Date(ev.start).toDateString() === todayStr);
+                    globalEventsCount = todayEvents.length;
+                    updateNotificationBadges();
+
                     if (events.length === 0) {
                         container.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:10px;">No tienes compromisos programados para los próximos 7 días.</div>';
                         return;
@@ -3019,23 +3133,33 @@
                             errMsg += ` (${errData.detail})`;
                         }
                     } catch(jsonErr) {}
-                    container.innerHTML = `<div style="text-align:center; color:var(--danger); padding:10px;">${errMsg}</div>`;
+                    if (!silent) {
+                        container.innerHTML = `<div style="text-align:center; color:var(--danger); padding:10px;">${errMsg}</div>`;
+                    }
                 }
             } catch (e) {
-                container.innerHTML = '<div style="text-align:center; color:var(--danger); padding:10px;">Error de conexión.</div>';
+                if (!silent) {
+                    container.innerHTML = '<div style="text-align:center; color:var(--danger); padding:10px;">Error de conexión.</div>';
+                }
             }
         }
 
-        async function loadGoogleTasks() {
+        async function loadGoogleTasks(silent = false) {
             const container = document.getElementById('dash_google_tasks');
             if(!container) return;
-            container.innerHTML = '<div style="text-align:center; color:var(--text-muted);"><i class="ph ph-spinner ph-spin"></i> Cargando tareas...</div>';
+            if (!silent) {
+                container.innerHTML = '<div style="text-align:center; color:var(--text-muted);"><i class="ph ph-spinner ph-spin"></i> Cargando tareas...</div>';
+            }
             
             try {
                 const res = await fetch('/api/tasks');
                 if (res.ok) {
                     const data = await res.json();
                     const tasks = data.tasks || [];
+                    
+                    globalTasksCount = tasks.length;
+                    updateNotificationBadges();
+
                     if (tasks.length === 0) {
                         container.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:10px;">No tienes tareas pendientes en Google Tasks.</div>';
                         return;
@@ -3069,10 +3193,14 @@
                             errMsg += ` (${errData.detail})`;
                         }
                     } catch(jsonErr) {}
-                    container.innerHTML = `<div style="text-align:center; color:var(--danger); padding:10px;">${errMsg}</div>`;
+                    if (!silent) {
+                        container.innerHTML = `<div style="text-align:center; color:var(--danger); padding:10px;">${errMsg}</div>`;
+                    }
                 }
             } catch (e) {
-                container.innerHTML = '<div style="text-align:center; color:var(--danger); padding:10px;">Error de conexión.</div>';
+                if (!silent) {
+                    container.innerHTML = '<div style="text-align:center; color:var(--danger); padding:10px;">Error de conexión.</div>';
+                }
             }
         }
 
