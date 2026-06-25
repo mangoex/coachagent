@@ -616,6 +616,211 @@
             }
         }
 
+        /* Mobile Bottom Nav styles */
+        .mobile-bottom-nav {
+            display: none;
+        }
+        
+        .mobile-logout-btn {
+            display: none;
+        }
+
+        .mobile-voice-feedback {
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            /* Hide non-mobile views from sidebar drawer just in case, but also hide drawer trigger and overlay */
+            .mobile-menu-btn {
+                display: none !important;
+            }
+            .sidebar-overlay {
+                display: none !important;
+            }
+            aside#sidebar {
+                display: none !important;
+            }
+            
+            /* Show logout button in header */
+            .mobile-logout-btn {
+                display: block !important;
+                background: none;
+                border: none;
+                color: var(--text-muted);
+                cursor: pointer;
+                font-size: 20px;
+                padding: 4px;
+                transition: var(--transition);
+            }
+            .mobile-logout-btn:hover {
+                color: var(--danger);
+            }
+            
+            /* Bottom Tab Bar */
+            .mobile-bottom-nav {
+                display: flex !important;
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                height: 65px;
+                background: rgba(15, 12, 32, 0.95);
+                backdrop-filter: blur(10px);
+                border-top: 1px solid rgba(255, 255, 255, 0.08);
+                z-index: 999;
+                justify-content: space-around;
+                align-items: center;
+            }
+
+            .mobile-nav-item {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                color: var(--text-muted);
+                text-decoration: none;
+                font-size: 11px;
+                gap: 4px;
+                flex: 1;
+                height: 100%;
+                transition: var(--transition);
+            }
+
+            .mobile-nav-item i {
+                font-size: 20px;
+            }
+
+            .mobile-nav-item.active {
+                color: var(--accent);
+            }
+            
+            /* Content Area adjustments */
+            main.content-area {
+                padding-bottom: 85px !important; /* Make room for bottom nav */
+            }
+            
+            /* Playground Simplification (Microphone Only) */
+            #view-playground .page-header {
+                display: none !important;
+            }
+            #view-playground .chat-header {
+                display: none !important;
+            }
+            #view-playground #chatMsgs {
+                display: none !important;
+            }
+            #view-playground #chatText {
+                display: none !important;
+            }
+            #view-playground .btn-send {
+                display: none !important;
+            }
+            
+            #view-playground .chat-container {
+                background: transparent !important;
+                border: none !important;
+                height: calc(100vh - 220px) !important;
+                display: flex !important;
+                flex-direction: column !important;
+                justify-content: space-between !important;
+                align-items: center !important;
+                padding: 20px 10px !important;
+            }
+            
+            #view-playground .chat-input-area {
+                border: none !important;
+                background: transparent !important;
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: center !important;
+                justify-content: center !important;
+                gap: 15px !important;
+                width: 100% !important;
+                padding: 20px 0 !important;
+            }
+            
+            #playground-mic-btn {
+                display: flex !important; /* Force show voice button on mobile */
+                width: 110px !important;
+                height: 110px !important;
+                font-size: 40px !important;
+                background: linear-gradient(135deg, var(--primary), var(--secondary)) !important;
+                border: none !important;
+                box-shadow: 0 8px 30px rgba(99, 102, 241, 0.4) !important;
+                order: 1;
+            }
+            
+            #playground-audio-btn {
+                display: flex !important; /* Force show audio output toggle */
+                order: 2;
+                font-size: 20px !important;
+                color: var(--text-muted);
+            }
+            
+            /* Voice Feedback Container */
+            .mobile-voice-feedback {
+                display: flex !important;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                text-align: center;
+                flex: 1;
+                gap: 24px;
+                width: 100%;
+                max-width: 320px;
+                margin: auto;
+            }
+            
+            .voice-avatar {
+                position: relative;
+                width: 80px;
+                height: 80px;
+                border-radius: 50%;
+                background: rgba(255, 255, 255, 0.03);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            
+            .voice-avatar i {
+                font-size: 40px;
+                color: var(--accent);
+            }
+            
+            .voice-status {
+                font-family: 'Outfit', sans-serif;
+                font-size: 18px;
+                font-weight: 500;
+                color: #fff;
+            }
+            
+            .voice-transcription {
+                font-size: 14px;
+                color: var(--text-muted);
+                line-height: 1.5;
+                min-height: 50px;
+                padding: 10px;
+                border-radius: 12px;
+                background: rgba(255, 255, 255, 0.02);
+                width: 100%;
+                box-sizing: border-box;
+                font-style: italic;
+            }
+            
+            #playground-mic-btn.recording {
+                background: var(--danger) !important;
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7) !important;
+                animation: pulse-ring-mic 1.5s infinite !important;
+            }
+        }
+        
+        @keyframes pulse-ring-mic {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 20px rgba(239, 68, 68, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+
     </style>
 </head>
 <body>
@@ -753,6 +958,9 @@
             <div class="mobile-header">
                 <div class="logo-text" style="font-size: 18px;"><i class="ph-fill ph-robot" style="color:var(--accent)"></i> Sales Coach</div>
                 <button class="mobile-menu-btn" onclick="toggleSidebar()"><i class="ph ph-list"></i></button>
+                <button class="mobile-logout-btn" onclick="window.firebaseLogout()" title="Cerrar Sesión">
+                    <i class="ph ph-sign-out"></i>
+                </button>
             </div>
             
             <main class="content-area">
@@ -875,6 +1083,16 @@
                                 ¡Hola! Soy tu Asistente de Ventas de Google AI. Estoy aquí para ayudarte a gestionar tu agenda, dar seguimiento a clientes y automatizar cotizaciones.<br><br>¿En qué te puedo ayudar hoy?
                             </div>
                         </div>
+                    </div>
+
+                    <!-- Voice feedback elements for mobile -->
+                    <div class="mobile-voice-feedback">
+                        <div class="voice-avatar">
+                            <div class="pulse-ring"></div>
+                            <i class="ph-fill ph-robot"></i>
+                        </div>
+                        <div id="mobile-voice-status" class="voice-status">Presiona el micrófono para hablar</div>
+                        <div id="mobile-voice-transcription" class="voice-transcription">Prueba pidiendo, agendando, tomando notas o solicitando información</div>
                     </div>
                     
                     <div class="chat-input-area" style="display:flex; align-items:center; gap:8px;">
@@ -1524,6 +1742,18 @@
             </div>
 
         </main>
+        
+        <!-- Bottom Nav Bar for Mobile -->
+        <div class="mobile-bottom-nav">
+            <a href="#" class="mobile-nav-item" onclick="showAppView('advantage'); return false;" id="mobile-nav-advantage">
+                <i class="ph ph-trend-up"></i>
+                <span>La Ventaja</span>
+            </a>
+            <a href="#" class="mobile-nav-item" onclick="showAppView('playground'); return false;" id="mobile-nav-playground">
+                <i class="ph ph-microphone"></i>
+                <span>Playground</span>
+            </a>
+        </div>
         </div>
     </div>
 
@@ -1694,18 +1924,32 @@
 
             if(mode === 'login') document.getElementById('screen-login').classList.remove('hidden');
             else if(mode === 'onboarding') document.getElementById('screen-onboarding').classList.remove('hidden');
-            else if(mode === 'app') document.getElementById('screen-app').classList.remove('hidden');
+            else if(mode === 'app') {
+                document.getElementById('screen-app').classList.remove('hidden');
+                
+                // If on mobile, default view should be La Ventaja
+                if (window.innerWidth <= 768) {
+                    const activePanel = document.querySelector('.view-panel.active');
+                    if (!activePanel || (activePanel.id !== 'view-advantage' && activePanel.id !== 'view-playground')) {
+                        showAppView('advantage');
+                    }
+                }
+            }
         }
 
         function showAppView(view) {
             document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
             document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.mobile-nav-item').forEach(b => b.classList.remove('active'));
             
             const panel = document.getElementById(`view-${view}`);
             if (panel) panel.classList.add('active');
             
             const btn = document.getElementById(`nav-${view}`);
             if (btn) btn.classList.add('active');
+
+            const mobileBtn = document.getElementById(`mobile-nav-${view}`);
+            if (mobileBtn) mobileBtn.classList.add('active');
             
             // Close sidebar on mobile after clicking
             document.getElementById('sidebar').classList.remove('open');
@@ -1991,6 +2235,12 @@
             const text = textEl.value.trim();
             if(!text) return;
             
+            // Mobile Voice Feedback
+            const statusEl = document.getElementById('mobile-voice-status');
+            const transEl = document.getElementById('mobile-voice-transcription');
+            if (statusEl) statusEl.textContent = "Procesando...";
+            if (transEl) transEl.textContent = `"${text}"`;
+
             // Auto-fetch phone from seller data!
             const phone = window.sellerData?.phone_number;
             if(!phone) {
@@ -2033,6 +2283,10 @@
                         <div class="message-bubble">${replyText.replace(/\n/g, '<br>')}</div>
                     </div>`;
                 speakText(replyText);
+
+                // Mobile Voice Feedback
+                if (statusEl) statusEl.textContent = "Sales Coach AI:";
+                if (transEl) transEl.textContent = replyText;
             } catch(e) {
                 const loader = document.getElementById(loadingId);
                 if(loader) loader.remove();
@@ -2040,6 +2294,10 @@
                     <div class="message-row agent">
                         <div class="message-bubble" style="color:var(--danger)">Error de conexión al servidor de IA.</div>
                     </div>`;
+
+                // Mobile Voice Feedback
+                if (statusEl) statusEl.textContent = "Error";
+                if (transEl) transEl.textContent = "Error de conexión al servidor de IA.";
             }
             chatMsgs.scrollTop = chatMsgs.scrollHeight;
         }
@@ -2096,12 +2354,24 @@
                 }
                 const inputEl = document.getElementById('chatText');
                 if (inputEl) inputEl.placeholder = "Escuchando...";
+
+                // Mobile Voice Feedback
+                const statusEl = document.getElementById('mobile-voice-status');
+                if (statusEl) statusEl.textContent = "Escuchando...";
+                const transEl = document.getElementById('mobile-voice-transcription');
+                if (transEl) transEl.textContent = "";
             };
 
             playgroundRecognition.onerror = (e) => {
                 console.error("Speech recognition error:", e.error);
                 isPlaygroundListening = false;
                 resetPlaygroundMicUI();
+
+                // Mobile Voice Feedback
+                const statusEl = document.getElementById('mobile-voice-status');
+                if (statusEl) statusEl.textContent = "Error de audio";
+                const transEl = document.getElementById('mobile-voice-transcription');
+                if (transEl) transEl.textContent = "No se pudo detectar tu voz. Inténtalo de nuevo.";
             };
 
             playgroundRecognition.onend = () => {
@@ -2111,6 +2381,11 @@
 
             playgroundRecognition.onresult = (event) => {
                 const text = event.results[0][0].transcript;
+                
+                // Mobile Voice Feedback
+                const transEl = document.getElementById('mobile-voice-transcription');
+                if (transEl) transEl.textContent = `"${text}"`;
+                
                 const inputEl = document.getElementById('chatText');
                 if (inputEl) {
                     inputEl.value = text;
