@@ -39,7 +39,11 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True, nullable=False)
     name = Column(String, nullable=False)
-    phone_number = Column(String, unique=True, index=True, nullable=False)  # Format: "52155..." or "+1..."
+    phone_number = Column(String, index=True, nullable=False)  # Format: "52155..." or "+1..."
+    
+    __table_args__ = (
+        UniqueConstraint('company_id', 'phone_number', name='uix_company_phone'),
+    )
     
     # Firebase and Role modifications
     firebase_uid = Column(String, unique=True, index=True, nullable=True)
@@ -107,6 +111,8 @@ class ConversationLog(Base):
     phone_number = Column(String, index=True, nullable=False)  # WhatsApp number of the sender/recipient
     sender = Column(String, nullable=False)  # "user" (salesperson) or "agent"
     message = Column(Text, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    company_id = Column(Integer, ForeignKey("companies.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 

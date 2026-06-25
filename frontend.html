@@ -38,6 +38,21 @@
             provider.addScope('https://www.googleapis.com/auth/spreadsheets');
             provider.addScope('https://www.googleapis.com/auth/drive');
 
+            // Intercept window.fetch to automatically include Firebase ID token
+            const originalFetch = window.fetch;
+            window.fetch = async function(url, options = {}) {
+                if (auth && auth.currentUser) {
+                    try {
+                        const idToken = await auth.currentUser.getIdToken();
+                        options.headers = options.headers || {};
+                        options.headers["Authorization"] = `Bearer ${idToken}`;
+                    } catch (e) {
+                        console.error("Error setting Firebase ID token:", e);
+                    }
+                }
+                return originalFetch(url, options);
+            };
+
             onAuthStateChanged(auth, async (user) => {
                 if (user) {
                     window.currentUser = { email: user.email, uid: user.uid, refreshToken: "", photoURL: user.photoURL, displayName: user.displayName };
@@ -120,35 +135,35 @@
         };
 
         window.connectGoogleWorkspace = async function() {
-            if(!auth) return alert("Firebase no configurado.");
+            if(!window.currentUser || !window.currentUser.email) {
+                return alert("Debes iniciar sesión primero.");
+            }
             
-            // Create a dedicated provider for connecting workspace
-            const connectProvider = new GoogleAuthProvider();
-            connectProvider.setCustomParameters({ prompt: 'consent', access_type: 'offline' });
-            connectProvider.addScope('https://www.googleapis.com/auth/calendar');
-            connectProvider.addScope('https://www.googleapis.com/auth/spreadsheets');
-            connectProvider.addScope('https://www.googleapis.com/auth/drive');
-
+            const email = window.currentUser.email;
+            const width = 600;
+            const height = 650;
+            const left = (screen.width - width) / 2;
+            const top = (screen.height - height) / 2;
+            
             try {
-                const result = await signInWithPopup(auth, connectProvider);
-                const credential = GoogleAuthProvider.credentialFromResult(result);
-                // Save token to backend
-                if(window.sellerData && window.sellerData.id && credential.accessToken) {
-                    // Note: Ideally we want a refresh token, but Firebase doesn't expose it directly in web SDK easily. 
-                    // However, we pass the access token or let the backend do the oauth flow.
-                    // For now, we will just send whatever we get as a placeholder, but this needs backend OAuth flow for real offline access.
-                    const res = await fetch(`/auth/seller/${window.sellerData.id}/google`, {
-                        method: 'PUT',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({ google_refresh_token: credential.accessToken })
-                    });
-                    if(res.ok) {
-                        alert("¡Google Workspace conectado exitosamente!");
-                        loadDashboard(window.currentUser.email); // Reload
-                    } else {
-                        alert("Error al vincular con el servidor.");
-                    }
+                // Open backend OAuth link in a popup window
+                const authWindow = window.open(
+                    `/auth/google/url?email=${encodeURIComponent(email)}`,
+                    "Conectar Google Workspace",
+                    `width=${width},height=${height},top=${top},left=${left}`
+                );
+                
+                if (!authWindow) {
+                    return alert("El bloqueador de ventanas emergentes impidió conectar con Google. Por favor permítele abrir ventanas emergentes a esta página.");
                 }
+                
+                // Listen for window close to reload dashboard and check if connected
+                const checkClosed = setInterval(() => {
+                    if (authWindow.closed) {
+                        clearInterval(checkClosed);
+                        loadDashboard(email); // Reload dashboard to update connection status
+                    }
+                }, 1000);
             } catch (error) {
                 console.error("Error connecting workspace:", error);
                 alert("Error al conectar: " + error.message);
@@ -663,6 +678,22 @@
                     </div>
                     <div id="dash_upcoming_events" style="padding: 20px;">
                         <div style="text-align:center; color:var(--text-muted);"><i class="ph ph-spinner ph-spin"></i> Cargando agenda...</div>
+                    </div>
+                </div>
+
+                <div class="card glass" style="margin-top: 20px; border-left: 4px solid #10b981;">
+                    <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+                        <div class="card-title"><i class="ph ph-list-checks"></i> Tareas Pendientes (Google Tasks)</div>
+                        <button class="btn btn-outline" style="padding: 4px 10px; font-size:12px;" onclick="loadGoogleTasks()"><i class="ph ph-arrows-clockwise"></i></button>
+                    </div>
+                    <div style="padding: 20px;">
+                        <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                            <input type="text" id="new_task_title" placeholder="Ej. Llamar a cliente a las 5pm" style="flex: 1; padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); color: white;" onkeypress="if(event.key==='Enter') addGoogleTask()">
+                            <button class="btn" style="background: linear-gradient(135deg, #10b981, #059669); border: none; padding: 8px 14px;" onclick="addGoogleTask()">Agregar</button>
+                        </div>
+                        <div id="dash_google_tasks">
+                            <div style="text-align:center; color:var(--text-muted);"><i class="ph ph-spinner ph-spin"></i> Cargando tareas...</div>
+                        </div>
                     </div>
                 </div>
 
@@ -1723,11 +1754,13 @@
                         loadCompanyData(data.company_code);
                     }
 
-                    // Load Upcoming Events
+                    // Load Upcoming Events and Tasks
                     if (data.is_google_connected) {
                         loadUpcomingEvents(data.id);
+                        loadGoogleTasks();
                     } else {
                         document.getElementById('dash_upcoming_events').innerHTML = '<div style="text-align:center; color:var(--text-muted); padding: 10px;">Conecta Google Workspace para ver tu agenda.</div>';
+                        document.getElementById('dash_google_tasks').innerHTML = '<div style="text-align:center; color:var(--text-muted); padding: 10px;">Conecta Google Workspace para ver tus tareas.</div>';
                     }
 
                     // Show Main App
@@ -1981,6 +2014,112 @@
                 }
             } catch (e) {
                 container.innerHTML = '<div style="text-align:center; color:var(--danger); padding:10px;">Error de conexión.</div>';
+            }
+        }
+
+        async function loadGoogleTasks() {
+            const container = document.getElementById('dash_google_tasks');
+            if(!container) return;
+            container.innerHTML = '<div style="text-align:center; color:var(--text-muted);"><i class="ph ph-spinner ph-spin"></i> Cargando tareas...</div>';
+            
+            try {
+                const res = await fetch('/api/tasks');
+                if (res.ok) {
+                    const data = await res.json();
+                    const tasks = data.tasks || [];
+                    if (tasks.length === 0) {
+                        container.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:10px;">No tienes tareas pendientes en Google Tasks.</div>';
+                        return;
+                    }
+
+                    let html = '<div style="display:flex; flex-direction:column; gap:10px;">';
+                    tasks.forEach(t => {
+                        let notesHtml = t.notes ? `<div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">${t.notes}</div>` : '';
+                        let dueHtml = t.due ? `<div style="font-size: 11px; color: var(--warning); margin-top: 4px;"><i class="ph ph-calendar"></i> Fecha límite: ${new Date(t.due).toLocaleDateString('es-MX')}</div>` : '';
+                        html += `
+                            <div id="task_item_${t.id}" style="background: rgba(255,255,255,0.03); border-radius: 8px; padding: 12px; display:flex; justify-content:space-between; align-items:center; transition: all 0.3s ease;">
+                                <div style="display:flex; align-items:center; gap:10px; flex: 1;">
+                                    <input type="checkbox" style="cursor:pointer; width: 18px; height: 18px; accent-color: #10b981;" onclick="completeGoogleTask('${t.id}')">
+                                    <div>
+                                        <div style="font-weight: 500; font-size: 14px;">${t.title}</div>
+                                        ${notesHtml}
+                                        ${dueHtml}
+                                    </div>
+                                </div>
+                                <span style="font-size:10px; background: rgba(16,185,129,0.1); color: #10b981; padding: 4px 8px; border-radius: 4px;">Google Tasks</span>
+                            </div>
+                        `;
+                    });
+                    html += '</div>';
+                    container.innerHTML = html;
+                } else {
+                    container.innerHTML = '<div style="text-align:center; color:var(--danger); padding:10px;">Error al cargar las tareas.</div>';
+                }
+            } catch (e) {
+                container.innerHTML = '<div style="text-align:center; color:var(--danger); padding:10px;">Error de conexión.</div>';
+            }
+        }
+
+        async function addGoogleTask() {
+            const titleInput = document.getElementById('new_task_title');
+            if(!titleInput) return;
+            const title = titleInput.value.trim();
+            if(!title) return;
+            
+            const btn = document.querySelector('button[onclick="addGoogleTask()"]');
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = '<i class="ph ph-spinner ph-spin"></i>';
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/api/tasks', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ title: title })
+                });
+                if(res.ok) {
+                    titleInput.value = '';
+                    loadGoogleTasks();
+                } else {
+                    console.error("Error creating Google task");
+                }
+            } catch(e) {
+                console.error("Connection error creating Google task", e);
+            }
+            btn.innerHTML = originalHTML;
+            btn.disabled = false;
+        }
+
+        async function completeGoogleTask(taskId) {
+            const el = document.getElementById(`task_item_${taskId}`);
+            if(el) {
+                el.style.opacity = '0.5';
+                el.style.transform = 'scale(0.95)';
+            }
+            try {
+                const res = await fetch(`/api/tasks/${taskId}/complete`, {
+                    method: 'POST'
+                });
+                if(res.ok) {
+                    if(el) {
+                        el.style.transition = 'all 0.5s ease';
+                        el.style.opacity = '0';
+                        el.style.height = '0';
+                        el.style.padding = '0';
+                        el.style.margin = '0';
+                        setTimeout(() => {
+                            loadGoogleTasks();
+                        }, 500);
+                    } else {
+                        loadGoogleTasks();
+                    }
+                } else {
+                    console.error("Error completing Google task");
+                    loadGoogleTasks();
+                }
+            } catch(e) {
+                console.error("Connection error completing Google task", e);
+                loadGoogleTasks();
             }
         }
 

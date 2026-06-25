@@ -66,3 +66,90 @@ class GoogleSheetsService:
         crm_data["precios"] = cls._parse_rows_to_dicts(precios_raw)
 
         return crm_data
+
+    @classmethod
+    def append_crm_client(cls, refresh_token: str, spreadsheet_id: str, client_name: str, client_email: str, client_phone: str, notes: str = "", status: str = "Nuevo") -> str:
+        """
+        Appends a new client row to the 'Clientes' sheet.
+        """
+        service = cls._get_sheets_client(refresh_token)
+        try:
+            # We assume columns: Nombre, Email, Teléfono, Estado, Notas (or similar)
+            values = [[client_name, client_email, client_phone, status, notes]]
+            body = {
+                "values": values
+            }
+            # Append to the bottom of Clientes tab
+            result = service.spreadsheets().values().append(
+                spreadsheetId=spreadsheet_id,
+                range="Clientes!A2",
+                valueInputOption="USER_ENTERED",
+                insertDataOption="INSERT_ROWS",
+                body=body
+            ).execute()
+            updated_range = result.get("updates", {}).get("updatedRange", "Clientes")
+            logger.info(f"Appended client {client_name} to sheet {spreadsheet_id}, range: {updated_range}")
+            return f"Cliente '{client_name}' agregado exitosamente al CRM de Google Sheets."
+        except Exception as e:
+            logger.error(f"Error appending client to sheet {spreadsheet_id}: {str(e)}")
+            return f"Error al agregar cliente en Google Sheets: {str(e)}"
+
+    @classmethod
+    def update_crm_client_status(cls, refresh_token: str, spreadsheet_id: str, client_phone_or_email: str, new_status: str, notes: Optional[str] = None) -> str:
+        """
+        Searches for a client by phone number or email and updates their Status (column D) and optionally Notes (column E).
+        Assumes columns: A=Nombre, B=Email, C=Teléfono, D=Estado, E=Notas
+        """
+        service = cls._get_sheets_client(refresh_token)
+        try:
+            # Fetch all existing clients (read up to row 1000)
+            raw_values = cls.get_sheet_values(refresh_token, spreadsheet_id, "Clientes!A1:E1000")
+            if not raw_values:
+                return "No se encontraron datos en la hoja de Clientes."
+            
+            search_key = client_phone_or_email.lower().strip()
+            
+            # Find row index (1-indexed for Sheets API)
+            row_idx = -1
+            for idx, row in enumerate(raw_values):
+                if idx == 0:  # Skip headers
+                    continue
+                # Row columns: 0=Nombre, 1=Email, 2=Teléfono
+                email_val = row[1].lower().strip() if len(row) > 1 else ""
+                phone_val = str(row[2]).strip() if len(row) > 2 else ""
+                
+                # Check match
+                if search_key in email_val or search_key in phone_val or (phone_val and search_key.replace("+", "") in phone_val.replace("+", "")):
+                    row_idx = idx + 1 # 1-based index
+                    break
+            
+            if row_idx == -1:
+                return f"No se encontró ningún cliente en el CRM con el correo o teléfono: {client_phone_or_email}"
+            
+            # Update status in column D (which is index 4, i.e. column 'D')
+            body_status = {
+                "values": [[new_status]]
+            }
+            service.spreadsheets().values().update(
+                spreadsheetId=spreadsheet_id,
+                range=f"Clientes!D{row_idx}",
+                valueInputOption="USER_ENTERED",
+                body=body_status
+            ).execute()
+            
+            # Optionally update notes in column E (index 5)
+            if notes:
+                body_notes = {
+                    "values": [[notes]]
+                }
+                service.spreadsheets().values().update(
+                    spreadsheetId=spreadsheet_id,
+                    range=f"Clientes!E{row_idx}",
+                    valueInputOption="USER_ENTERED",
+                    body=body_notes
+                ).execute()
+                
+            return f"Estado de cliente '{client_phone_or_email}' actualizado a '{new_status}' en la fila {row_idx}."
+        except Exception as e:
+            logger.error(f"Error updating client status in sheet {spreadsheet_id}: {str(e)}")
+            return f"Error al actualizar cliente en Google Sheets: {str(e)}"

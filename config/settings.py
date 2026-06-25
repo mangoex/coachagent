@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     # GCS Settings
     GCS_BUCKET_NAME: str = "coachagent-quotations-bucket"
 
+    # Asistto Webhook Secret Key
+    ASISTTO_WEBHOOK_KEY: Optional[str] = "your_secure_asistto_webhook_key"
+
     # Google OAuth client settings (For refresh token flow if credentials file is not present)
     GOOGLE_CLIENT_ID: Optional[str] = None
     GOOGLE_CLIENT_SECRET: Optional[str] = None

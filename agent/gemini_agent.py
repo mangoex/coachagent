@@ -48,9 +48,11 @@ class GeminiAgent:
                     "Tu objetivo es ayudar a los vendedores a gestionar su agenda, dar seguimiento a clientes y automatizar cotizaciones.\n"
                     "Tienes acceso a herramientas nativas de Google Workspace (Calendar, Tasks, Sheets, Docs) para las notificaciones y recordatorios.\n"
                     "Cuando se te solicite leer el CRM o ver los clientes/productos/precios, lee el CRM en Google Sheets.\n"
+                    "Cuando necesites agregar un nuevo cliente o prospecto al CRM, usa la herramienta add_crm_client.\n"
+                    "Si el vendedor te informa que ha contactado, cotizado, vendido o cerrado una oportunidad con un cliente, actualiza su estado y notas en el CRM usando la herramienta update_crm_client.\n"
                     "Cuando se apruebe una cotización, usa la herramienta generate_quotation para generar la propuesta y devuélvele al vendedor el enlace firmado del PDF resultante.\n"
                     "Tienes acceso a herramientas de accountability: si el vendedor te dice que hoy realizó llamadas, citas o propuestas, puedes usar la herramienta log_user_activities para registrarlas. También puedes usar get_user_accountability_progress para verificar cómo va el vendedor con respecto a sus metas diarias, semanales y mensuales y decírselo de forma motivadora y concisa.\n"
-                    "Reglas de comunicación por WhatsApp: Cuando el vendedor te pida agendar una cita o tarea, usa las herramientas nativas (Calendar o Tasks). Para citas con clientes, usa create_calendar_event agregando su email en attendees para que le llegue confirmación automática por correo. Para recordatorios de seguimiento personal, usa create_google_task para que la alerta suene en su Google Calendar. En WhatsApp responde SIEMPRE de manera muy breve (ej: 'Listo, agendado en tu Calendar/Tasks'). Evita enviar mensajes largos de confirmación.\n"
+                    "Reglas de comunicación por WhatsApp: Cuando el vendedor te pida agendar una cita o tarea, usa las herramientas nativas (Calendar o Tasks). Para citas con clientes, usa create_calendar_event agregando su email en attendees para que le llegue confirmación automática por correo. Para recordatorios de seguimiento personal, usa create_google_task. Si el vendedor te pregunta por sus tareas pendientes, usa list_google_tasks para verlas, y si te pide marcar una tarea como realizada/completada, usa complete_google_task. En WhatsApp responde SIEMPRE de manera muy breve (ej: 'Listo, agendado en tu Calendar/Tasks' o 'Listo, tarea completada'). Evita enviar mensajes largos de confirmación.\n"
                     "Mantén un tono profesional, motivador, conciso y enfocado a objetivos comerciales. Responde en español.\n"
                 )
                 
@@ -241,6 +243,53 @@ class GeminiAgent:
                 logger.error(f"Failed to create task: {str(e)}")
                 return f"Error creating task: {str(e)}"
 
+        def list_google_tasks(show_completed: bool = False) -> str:
+            """
+            List the user's tasks from Google Tasks.
+            
+            Args:
+                show_completed: If True, lists completed tasks as well. Defaults to False (pending tasks only).
+            """
+            auth_err = _check_auth()
+            if auth_err: return auth_err
+            try:
+                tasks = GoogleTasksService.list_tasks(
+                    refresh_token=self.refresh_token,
+                    show_completed=show_completed
+                )
+                simplified_tasks = []
+                for t in tasks:
+                    simplified_tasks.append({
+                        "id": t.get("id"),
+                        "title": t.get("title"),
+                        "notes": t.get("notes", ""),
+                        "status": t.get("status"),
+                        "due": t.get("due", "")
+                    })
+                return json.dumps(simplified_tasks, ensure_ascii=False)
+            except Exception as e:
+                logger.error(f"Failed to list tasks: {str(e)}")
+                return f"Error listing tasks: {str(e)}"
+
+        def complete_google_task(task_id: str) -> str:
+            """
+            Mark a specific task as completed in Google Tasks.
+            
+            Args:
+                task_id: The unique ID of the task to complete.
+            """
+            auth_err = _check_auth()
+            if auth_err: return auth_err
+            try:
+                task = GoogleTasksService.complete_task(
+                    refresh_token=self.refresh_token,
+                    task_id=task_id
+                )
+                return f"Task '{task.get('title')}' marked as completed successfully."
+            except Exception as e:
+                logger.error(f"Failed to complete task: {str(e)}")
+                return f"Error completing task: {str(e)}"
+
         def read_crm_data() -> str:
             """
             Read client list, products, and prices from the spreadsheet CRM.
@@ -254,6 +303,42 @@ class GeminiAgent:
                 return json.dumps(data, ensure_ascii=False)
             except Exception as e:
                 return f"Error reading CRM: {str(e)}"
+
+        def add_crm_client(client_name: str, client_email: str, client_phone: str, notes: str = "", status: str = "Nuevo") -> str:
+            """
+            Agrega un nuevo cliente al CRM (Google Sheets).
+            
+            Args:
+                client_name: Nombre completo del cliente.
+                client_email: Correo electrónico del cliente.
+                client_phone: Número de teléfono del cliente.
+                notes: Notas o comentarios adicionales sobre el cliente.
+                status: Estado inicial (ej. 'Nuevo', 'Contactado', 'Cotizado'). Por defecto 'Nuevo'.
+            """
+            auth_err = _check_auth()
+            if auth_err: return auth_err
+            if not self.spreadsheet_id:
+                return "Error: No CRM spreadsheet ID configured."
+            return GoogleSheetsService.append_crm_client(
+                self.refresh_token, self.spreadsheet_id, client_name, client_email, client_phone, notes, status
+            )
+
+        def update_crm_client(client_phone_or_email: str, new_status: str, notes: str = "") -> str:
+            """
+            Actualiza el estado y notas de un cliente existente en el CRM (Google Sheets) buscando por teléfono o correo.
+            
+            Args:
+                client_phone_or_email: Correo o teléfono del cliente a buscar y actualizar.
+                new_status: Nuevo estado a establecer (ej. 'Cotizado', 'Cerrado', 'Perdido').
+                notes: Notas o seguimiento adicional a agregar.
+            """
+            auth_err = _check_auth()
+            if auth_err: return auth_err
+            if not self.spreadsheet_id:
+                return "Error: No CRM spreadsheet ID configured."
+            return GoogleSheetsService.update_crm_client_status(
+                self.refresh_token, self.spreadsheet_id, client_phone_or_email, new_status, notes or None
+            )
 
         def generate_quotation(client_name: str, product_name: str, quantity: int, price: float, discount: float = 0.0) -> str:
             """
@@ -532,11 +617,15 @@ class GeminiAgent:
             "update_calendar_event": update_calendar_event,
             "delete_calendar_event": delete_calendar_event,
             "read_crm_data": read_crm_data,
+            "add_crm_client": add_crm_client,
+            "update_crm_client": update_crm_client,
             "generate_quotation": generate_quotation,
             "schedule_followup": schedule_followup,
             "log_user_activities": log_user_activities,
             "get_user_accountability_progress": get_user_accountability_progress,
-            "create_google_task": create_google_task
+            "create_google_task": create_google_task,
+            "list_google_tasks": list_google_tasks,
+            "complete_google_task": complete_google_task
         }
         declarations = [FunctionDeclaration.from_func(func) for func in self.tools_map.values()]
         self.tools_list = Tool(function_declarations=declarations)

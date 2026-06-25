@@ -52,3 +52,24 @@ class GoogleTasksService:
         except Exception as e:
             logger.error(f"Error listing Google Tasks: {e}")
             raise
+
+    @classmethod
+    def complete_task(cls, refresh_token: str, task_id: str, tasklist_id: str = "@default") -> Dict[str, Any]:
+        """
+        Mark a Google Task as completed.
+        """
+        try:
+            service = cls._get_tasks_client(refresh_token)
+            task_body = {
+                "status": "completed"
+            }
+            updated_task = service.tasks().patch(
+                tasklist=tasklist_id,
+                task=task_id,
+                body=task_body
+            ).execute()
+            logger.info(f"Marked Google Task {task_id} as completed.")
+            return updated_task
+        except Exception as e:
+            logger.error(f"Error completing Google Task {task_id}: {e}")
+            raise

@@ -71,19 +71,26 @@ async def receive_message(request: Request, db: Session = Depends(get_db)):
     
     # Resolve company credentials if any
     company_token = None
+    company = None
     if dest_phone_id and dest_phone_id != settings.WHATSAPP_PHONE_NUMBER_ID:
         company = db.query(Company).filter(Company.whatsapp_phone_number_id == dest_phone_id).first()
         if company:
             company_token = company.get_whatsapp_token()
 
     # Find the salesperson/tenant associated with this phone number
-    user = db.query(User).filter(User.phone_number == from_phone).first()
+    if company:
+        # If dest_phone_id belongs to a company, scope search to that company
+        user = db.query(User).filter(User.phone_number == from_phone, User.company_id == company.id).first()
+    else:
+        # Sandbox fallback
+        user = db.query(User).filter(User.phone_number == from_phone).first()
+
     if not user:
-        logger.warning(f"Message received from unregistered phone number: {from_phone}")
+        logger.warning(f"Message received from unregistered phone number: {from_phone} on phone ID: {dest_phone_id}")
         # Optionally send a default warning message
         WhatsAppService.send_text_message(
             to_phone=from_phone,
-            text="Hola. Tu número de teléfono no está registrado en el sistema de Google AI Sales Coach Agent.",
+            text="Hola. Tu número de teléfono no está registrado en el sistema de Google AI Sales Coach Agent para esta empresa.",
             token=company_token,
             phone_id=dest_phone_id
         )
@@ -118,7 +125,7 @@ async def receive_message(request: Request, db: Session = Depends(get_db)):
             incoming_text = button_reply.get("title", "")
             logger.info(f"Interactive button clicked: {button_id} ({incoming_text})")
 
-    db_log_in = ConversationLog(phone_number=from_phone, sender="user", message=incoming_text)
+    db_log_in = ConversationLog(phone_number=from_phone, sender="user", message=incoming_text, user_id=user.id, company_id=user.company_id)
     db.add(db_log_in)
     db.commit()
 
@@ -203,7 +210,7 @@ async def receive_message(request: Request, db: Session = Depends(get_db)):
             WhatsAppService.send_text_message(from_phone, reply_text, token=company_token, phone_id=dest_phone_id)
             
             # Log reply to DB
-            db_log_out = ConversationLog(phone_number=from_phone, sender="agent", message=reply_text)
+            db_log_out = ConversationLog(phone_number=from_phone, sender="agent", message=reply_text, user_id=user.id, company_id=user.company_id)
             db.add(db_log_out)
             db.commit()
             return {"status": "ok"}
@@ -238,7 +245,7 @@ async def receive_message(request: Request, db: Session = Depends(get_db)):
             WhatsAppService.send_text_message(from_phone, reply_text, token=company_token, phone_id=dest_phone_id)
             
             # Log reply to DB
-            db_log_out = ConversationLog(phone_number=from_phone, sender="agent", message=reply_text)
+            db_log_out = ConversationLog(phone_number=from_phone, sender="agent", message=reply_text, user_id=user.id, company_id=user.company_id)
             db.add(db_log_out)
             db.commit()
             return {"status": "ok"}
@@ -268,7 +275,7 @@ async def receive_message(request: Request, db: Session = Depends(get_db)):
     WhatsAppService.send_text_message(from_phone, agent_reply, token=company_token, phone_id=dest_phone_id)
 
     # Log agent response to DB
-    db_log_out = ConversationLog(phone_number=from_phone, sender="agent", message=agent_reply)
+    db_log_out = ConversationLog(phone_number=from_phone, sender="agent", message=agent_reply, user_id=user.id, company_id=user.company_id)
     db.add(db_log_out)
     db.commit()
 

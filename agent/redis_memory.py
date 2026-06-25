@@ -52,8 +52,8 @@ class RedisConversationMemory:
         history.append({"role": role, "content": content})
         
         # Cap window length to prevent context explosion
-        if len(history) > 20:
-            history = history[-20:]
+        if len(history) > 50:
+            history = history[-50:]
 
         if self.use_redis:
             try:

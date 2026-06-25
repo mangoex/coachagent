@@ -1,4 +1,5 @@
-from fastapi import FastAPI, Depends, HTTPException, Request, BackgroundTasks
+from fastapi import FastAPI, Depends, HTTPException, Request, BackgroundTasks, Header, Security
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
@@ -19,6 +20,7 @@ from agent.gemini_agent import GeminiAgent
 from routers import whatsapp, cron, audit, slight_edge
 from config.settings import settings
 from services.calendar_service import GoogleCalendarService
+from services.tasks_service import GoogleTasksService
 
 # Set up logging configuration
 logging.basicConfig(
@@ -70,7 +72,11 @@ def startup_event():
                 "ALTER TABLE companies ADD COLUMN whatsapp_phone_number_id VARCHAR;",
                 "ALTER TABLE companies ADD COLUMN encrypted_whatsapp_token VARCHAR;",
                 "ALTER TABLE companies ADD COLUMN global_goals TEXT;",
-                "ALTER TABLE companies ADD COLUMN global_sales_target FLOAT DEFAULT 0.0;"
+                "ALTER TABLE companies ADD COLUMN global_sales_target FLOAT DEFAULT 0.0;",
+                "ALTER TABLE users DROP CONSTRAINT IF EXISTS users_phone_number_key;",
+                "ALTER TABLE users ADD CONSTRAINT uix_company_phone UNIQUE (company_id, phone_number);",
+                "ALTER TABLE conversation_logs ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE SET NULL;",
+                "ALTER TABLE conversation_logs ADD COLUMN IF NOT EXISTS company_id INTEGER REFERENCES companies(id) ON DELETE SET NULL;"
             ]
             for query in migrations:
                 try:
@@ -158,6 +164,11 @@ class AIGoalsCalculationRequest(BaseModel):
 class GoogleTokenUpdate(BaseModel):
     google_refresh_token: str
 
+class TaskCreate(BaseModel):
+    title: str
+    notes: Optional[str] = None
+    due: Optional[str] = None
+
 # Setup OAuth Flow helper
 SCOPES = [
     'https://www.googleapis.com/auth/calendar',
@@ -177,6 +188,48 @@ def get_client_secrets():
             "redirect_uris": []
         }
     }
+
+security_algo = HTTPBearer(auto_error=False)
+
+def verify_firebase_token(credentials: Optional[HTTPAuthorizationCredentials] = Security(security_algo), db: Session = Depends(get_db)):
+    """
+    Dependency to verify Firebase ID Token and resolve the User record.
+    In local development, if missing, falls back to the first user in DB to prevent breaking tests.
+    """
+    token = None
+    if credentials:
+        token = credentials.credentials
+
+    # Development mode bypass/fallback if token is missing
+    if settings.ENVIRONMENT == "development" and not token:
+        mock_user = db.query(User).first()
+        if mock_user:
+            return mock_user
+        # Create a transient developer mock user if DB is empty
+        mock_user = User(email="dev@example.com", name="Developer", phone_number="0000000000", role="vendedor_independiente")
+        db.add(mock_user)
+        db.commit()
+        db.refresh(mock_user)
+        return mock_user
+
+    if not token:
+        raise HTTPException(status_code=401, detail="Falta el token de autorización.")
+
+    try:
+        decoded_token = firebase_auth.verify_id_token(token)
+        uid = decoded_token.get("uid")
+        email = decoded_token.get("email")
+        
+        user = db.query(User).filter((User.firebase_uid == uid) | (User.email == email)).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="Vendedor no registrado en la base de datos.")
+        return user
+    except Exception as e:
+        if settings.ENVIRONMENT == "development":
+            mock_user = db.query(User).first()
+            if mock_user:
+                return mock_user
+        raise HTTPException(status_code=401, detail=f"Token inválido: {str(e)}")
 
 # Endpoints
 @app.post("/companies", status_code=201)
@@ -216,11 +269,14 @@ def update_company(company_code: str, payload: CompanyUpdate, db: Session = Depe
     return {"status": "ok"}
 
 @app.get("/companies/{company_code}/sellers")
-def list_company_sellers(company_code: str, db: Session = Depends(get_db)):
+def list_company_sellers(company_code: str, db: Session = Depends(get_db), current_user: User = Depends(verify_firebase_token)):
     company = db.query(Company).filter(Company.company_code == company_code).first()
     if not company:
         raise HTTPException(status_code=404, detail="Empresa no encontrada")
     
+    if current_user.role != "vendedor_independiente" and current_user.company_id != company.id:
+        raise HTTPException(status_code=403, detail="Acceso denegado: no perteneces a esta empresa.")
+        
     sellers = db.query(User).filter(User.company_id == company.id).all()
     return [
         {
@@ -263,12 +319,15 @@ def categorize_activity(name: str) -> str:
     return "otra"
 
 @app.get("/companies/{company_code}/dashboard")
-def get_dashboard_metrics(company_code: str, db: Session = Depends(get_db)):
+def get_dashboard_metrics(company_code: str, db: Session = Depends(get_db), current_user: User = Depends(verify_firebase_token)):
     from datetime import date, timedelta
     company = db.query(Company).filter(Company.company_code == company_code).first()
     if not company:
         raise HTTPException(status_code=404, detail="Empresa no encontrada")
     
+    if current_user.role != "vendedor_independiente" and current_user.company_id != company.id:
+        raise HTTPException(status_code=403, detail="Acceso denegado: no perteneces a esta empresa.")
+        
     sellers = db.query(User).filter(User.company_id == company.id).all()
     
     metrics_list = []
@@ -1022,11 +1081,21 @@ class WebhookPayload(BaseModel):
     message: str
 
 @app.post("/api/whatsapp/webhook/asistto")
-def asistto_webhook(payload: WebhookPayload, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+def asistto_webhook(
+    payload: WebhookPayload, 
+    background_tasks: BackgroundTasks, 
+    x_asistto_key: Optional[str] = Header(None),
+    db: Session = Depends(get_db)
+):
     """
     Receives forwarded messages from Asistto. 
     Asistto must be configured to send a POST request with JSON: {"phone": "+52...", "message": "..."}
     """
+    # Webhook key validation: Skip check if key is unset/default or if it is local development env
+    if settings.ASISTTO_WEBHOOK_KEY and settings.ASISTTO_WEBHOOK_KEY != "your_secure_asistto_webhook_key" and settings.ENVIRONMENT != "development":
+        if x_asistto_key != settings.ASISTTO_WEBHOOK_KEY:
+            raise HTTPException(status_code=401, detail="Invalid webhook key")
+
     user = db.query(User).filter(User.phone_number == payload.phone).first()
     if not user:
         # Ignore messages from numbers not registered as salespeople
@@ -1083,8 +1152,8 @@ def process_incoming_whatsapp_message(user_id: int, phone: str, message: str, wa
         redis_memory.add_message(phone, "user", message)
         redis_memory.add_message(phone, "agent", reply)
 
-        db.add(ConversationLog(phone_number=phone, sender="user", message=message))
-        db.add(ConversationLog(phone_number=phone, sender="agent", message=reply))
+        db.add(ConversationLog(phone_number=phone, sender="user", message=message, user_id=user.id, company_id=user.company_id))
+        db.add(ConversationLog(phone_number=phone, sender="agent", message=reply, user_id=user.id, company_id=user.company_id))
         db.commit()
 
         # Send the reply back via Meta Cloud API using the company's credentials
@@ -1125,8 +1194,8 @@ def agent_chat(payload: ChatRequest, db: Session = Depends(get_db)):
     redis_memory.add_message(payload.phone_number, "user", payload.message)
     redis_memory.add_message(payload.phone_number, "agent", reply)
 
-    db.add(ConversationLog(phone_number=payload.phone_number, sender="user", message=payload.message))
-    db.add(ConversationLog(phone_number=payload.phone_number, sender="agent", message=reply))
+    db.add(ConversationLog(phone_number=payload.phone_number, sender="user", message=payload.message, user_id=user.id, company_id=user.company_id))
+    db.add(ConversationLog(phone_number=payload.phone_number, sender="agent", message=reply, user_id=user.id, company_id=user.company_id))
     db.commit()
 
     return {"reply": reply}
@@ -1232,6 +1301,59 @@ def google_auth_callback(state: str, code: str, request: Request, db: Session = 
     except Exception as e:
         logger.error(f"Error en OAuth Callback: {e}")
         return HTMLResponse(f"<div style='text-align:center; padding: 50px; font-family: sans-serif;'><h1 style='color:red;'>Error al vincular:</h1><p>{str(e)}</p></div>")
+
+@app.get("/api/tasks")
+def list_user_tasks(db: Session = Depends(get_db), current_user: User = Depends(verify_firebase_token)):
+    refresh_token = current_user.get_refresh_token()
+    if not refresh_token:
+        raise HTTPException(status_code=400, detail="Google no conectado")
+    try:
+        tasks = GoogleTasksService.list_tasks(refresh_token, show_completed=False)
+        simplified = []
+        for t in tasks:
+            simplified.append({
+                "id": t.get("id"),
+                "title": t.get("title"),
+                "notes": t.get("notes"),
+                "status": t.get("status"),
+                "due": t.get("due")
+            })
+        return {"tasks": simplified}
+    except Exception as e:
+        logger.error(f"Error listing tasks: {e}")
+        raise HTTPException(status_code=500, detail=f"Error al listar tareas: {str(e)}")
+
+@app.post("/api/tasks")
+def create_user_task(payload: TaskCreate, db: Session = Depends(get_db), current_user: User = Depends(verify_firebase_token)):
+    refresh_token = current_user.get_refresh_token()
+    if not refresh_token:
+        raise HTTPException(status_code=400, detail="Google no conectado")
+    try:
+        task = GoogleTasksService.create_task(
+            refresh_token=refresh_token,
+            title=payload.title,
+            notes=payload.notes,
+            due_date_iso=payload.due
+        )
+        return {"detail": "Tarea creada exitosamente", "task": task}
+    except Exception as e:
+        logger.error(f"Error creating task: {e}")
+        raise HTTPException(status_code=500, detail=f"Error al crear tarea: {str(e)}")
+
+@app.post("/api/tasks/{task_id}/complete")
+def complete_user_task(task_id: str, db: Session = Depends(get_db), current_user: User = Depends(verify_firebase_token)):
+    refresh_token = current_user.get_refresh_token()
+    if not refresh_token:
+        raise HTTPException(status_code=400, detail="Google no conectado")
+    try:
+        task = GoogleTasksService.complete_task(
+            refresh_token=refresh_token,
+            task_id=task_id
+        )
+        return {"detail": "Tarea marcada como completada", "task": task}
+    except Exception as e:
+        logger.error(f"Error completing task: {e}")
+        raise HTTPException(status_code=500, detail=f"Error al completar tarea: {str(e)}")
 
 @app.get("/", response_class=HTMLResponse)
 def read_root():
