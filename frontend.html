@@ -2015,7 +2015,14 @@
                     html += '</div>';
                     container.innerHTML = html;
                 } else {
-                    container.innerHTML = '<div style="text-align:center; color:var(--danger); padding:10px;">Error al cargar la agenda.</div>';
+                    let errMsg = 'Error al cargar la agenda.';
+                    try {
+                        const errData = await res.json();
+                        if (errData && errData.detail) {
+                            errMsg += ` (${errData.detail})`;
+                        }
+                    } catch(jsonErr) {}
+                    container.innerHTML = `<div style="text-align:center; color:var(--danger); padding:10px;">${errMsg}</div>`;
                 }
             } catch (e) {
                 container.innerHTML = '<div style="text-align:center; color:var(--danger); padding:10px;">Error de conexión.</div>';
@@ -2058,7 +2065,14 @@
                     html += '</div>';
                     container.innerHTML = html;
                 } else {
-                    container.innerHTML = '<div style="text-align:center; color:var(--danger); padding:10px;">Error al cargar las tareas.</div>';
+                    let errMsg = 'Error al cargar las tareas.';
+                    try {
+                        const errData = await res.json();
+                        if (errData && errData.detail) {
+                            errMsg += ` (${errData.detail})`;
+                        }
+                    } catch(jsonErr) {}
+                    container.innerHTML = `<div style="text-align:center; color:var(--danger); padding:10px;">${errMsg}</div>`;
                 }
             } catch (e) {
                 container.innerHTML = '<div style="text-align:center; color:var(--danger); padding:10px;">Error de conexión.</div>';
