@@ -545,23 +545,7 @@
 
         /* Voice FAB & indicators for mobile only */
         .voice-fab {
-            position: fixed;
-            bottom: 25px;
-            right: 25px;
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            background: var(--primary);
-            border: none;
-            color: white;
-            font-size: 28px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 4px 15px rgba(124, 77, 255, 0.4);
-            cursor: pointer;
-            z-index: 9999;
-            transition: var(--transition);
+            display: none !important;
         }
         .voice-fab.recording {
             background: var(--danger);
@@ -672,6 +656,41 @@
                 align-items: center;
             }
 
+            /* Dynamic mobile bottom nav styles based on active tab */
+            .mobile-bottom-nav.active-advantage #mobile-nav-advantage {
+                display: none !important;
+            }
+            .mobile-bottom-nav.active-advantage #mobile-nav-playground {
+                display: flex !important;
+                justify-content: center !important;
+                align-items: center !important;
+                width: 100% !important;
+                flex: none !important;
+            }
+            .mobile-bottom-nav.active-advantage #mobile-nav-playground span {
+                display: none !important;
+            }
+            .mobile-bottom-nav.active-advantage #mobile-nav-playground i {
+                font-size: 28px !important;
+            }
+            
+            .mobile-bottom-nav.active-playground #mobile-nav-playground {
+                display: none !important;
+            }
+            .mobile-bottom-nav.active-playground #mobile-nav-advantage {
+                display: flex !important;
+                justify-content: center !important;
+                align-items: center !important;
+                width: 100% !important;
+                flex: none !important;
+            }
+            .mobile-bottom-nav.active-playground #mobile-nav-advantage span {
+                display: none !important;
+            }
+            .mobile-bottom-nav.active-playground #mobile-nav-advantage i {
+                font-size: 28px !important;
+            }
+
             .mobile-nav-item {
                 display: flex;
                 flex-direction: column;
@@ -728,33 +747,15 @@
             }
             
             #view-playground .chat-input-area {
-                border: none !important;
-                background: transparent !important;
-                display: flex !important;
-                flex-direction: column !important;
-                align-items: center !important;
-                justify-content: center !important;
-                gap: 15px !important;
-                width: 100% !important;
-                padding: 20px 0 !important;
+                display: none !important;
             }
             
             #playground-mic-btn {
-                display: flex !important; /* Force show voice button on mobile */
-                width: 110px !important;
-                height: 110px !important;
-                font-size: 40px !important;
-                background: linear-gradient(135deg, var(--primary), var(--secondary)) !important;
-                border: none !important;
-                box-shadow: 0 8px 30px rgba(99, 102, 241, 0.4) !important;
-                order: 1;
+                display: none !important;
             }
             
             #playground-audio-btn {
-                display: flex !important; /* Force show audio output toggle */
-                order: 2;
-                font-size: 20px !important;
-                color: var(--text-muted);
+                display: none !important;
             }
             
             /* Voice Feedback Container */
@@ -852,10 +853,10 @@
         body.mobile-mode #view-playground.voice-mode #chatMsgs { display: none !important; }
         body.mobile-mode #view-playground.voice-mode #chatText { display: none !important; }
         body.mobile-mode #view-playground.voice-mode .btn-send { display: none !important; }
-        body.mobile-mode #view-playground.voice-mode .chat-container { background: transparent !important; border: none !important; height: calc(100vh - 220px) !important; display: flex !important; flex-direction: column !important; justify-content: space-between !important; align-items: center !important; padding: 20px 10px !important; }
-        body.mobile-mode #view-playground.voice-mode .chat-input-area { border: none !important; background: transparent !important; display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; gap: 15px !important; width: 100% !important; padding: 20px 0 !important; }
-        body.mobile-mode #view-playground.voice-mode #playground-mic-btn { display: flex !important; width: 110px !important; height: 110px !important; font-size: 40px !important; background: linear-gradient(135deg, var(--primary), var(--secondary)) !important; border: none !important; box-shadow: 0 8px 30px rgba(99, 102, 241, 0.4) !important; order: 1; }
-        body.mobile-mode #view-playground.voice-mode #playground-audio-btn { display: flex !important; order: 2; font-size: 20px !important; color: var(--text-muted); }
+        body.mobile-mode #view-playground.voice-mode .chat-container { background: transparent !important; border: none !important; height: calc(100vh - 220px) !important; display: flex !important; flex-direction: column !important; justify-content: center !important; align-items: center !important; padding: 20px 10px !important; }
+        body.mobile-mode #view-playground.voice-mode .chat-input-area { display: none !important; }
+        body.mobile-mode #view-playground.voice-mode #playground-mic-btn { display: none !important; }
+        body.mobile-mode #view-playground.voice-mode #playground-audio-btn { display: none !important; }
         body.mobile-mode #view-playground.voice-mode .mobile-voice-feedback { display: flex !important; flex-direction: column; align-items: center; justify-content: center; text-align: center; flex: 1; gap: 24px; width: 100%; max-width: 320px; margin: auto; }
 
         /* Conditional styling for KEYBOARD MODE on mobile */
@@ -2058,6 +2059,42 @@
             // Close sidebar on mobile after clicking
             document.getElementById('sidebar').classList.remove('open');
             document.getElementById('sidebarOverlay').classList.remove('open');
+            
+            // Dynamically show only the other button in mobile bottom nav
+            const mobileBottomNav = document.querySelector('.mobile-bottom-nav');
+            if (mobileBottomNav) {
+                mobileBottomNav.classList.remove('active-advantage', 'active-playground');
+                if (view === 'advantage') {
+                    mobileBottomNav.classList.add('active-advantage');
+                } else if (view === 'playground') {
+                    mobileBottomNav.classList.add('active-playground');
+                }
+            }
+
+            // Auto-start voice capture in Playground, or stop when switching away
+            if (view === 'playground') {
+                const pg = document.getElementById('view-playground');
+                if (pg && !pg.classList.contains('voice-mode')) {
+                    pg.classList.remove('keyboard-mode');
+                    pg.classList.add('voice-mode');
+                }
+                
+                if (isMobileDevice()) {
+                    unlockSpeechSynthesis();
+                    setTimeout(() => {
+                        if (!isPlaygroundListening) {
+                            togglePlaygroundVoiceCapture();
+                        }
+                    }, 500);
+                }
+            } else {
+                if (isPlaygroundListening && playgroundRecognition) {
+                    try { playgroundRecognition.stop(); } catch(e) {}
+                }
+                if (window.speechSynthesis) {
+                    try { window.speechSynthesis.cancel(); } catch(e) {}
+                }
+            }
             
             if (view === 'settings') {
                 loadCalendars();
