@@ -31,9 +31,12 @@ logger = logging.getLogger(__name__)
 
 # Try to initialize Firebase Admin (will fail gracefully if no credentials exist)
 try:
+    try:
+        default_app = firebase_admin.get_app()
+        firebase_admin.delete_app(default_app)
+    except ValueError:
+        pass
     firebase_admin.initialize_app(options={'projectId': 'coachagent-ebcd7'})
-except ValueError:
-    pass
 except Exception as e:
     logger.warning(f"Firebase not initialized: {e}")
 
