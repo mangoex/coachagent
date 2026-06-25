@@ -609,9 +609,9 @@
             100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 77, 77, 0); }
         }
 
-        /* Hide voice controls on desktop */
+        /* Hide voice/mobile controls on desktop */
         @media (min-width: 769px) {
-            .voice-only-mobile {
+            .voice-only-mobile, .mobile-only {
                 display: none !important;
             }
         }
@@ -771,16 +771,28 @@
                 margin: auto;
             }
             
-            .voice-avatar {
-                position: relative;
-                width: 80px;
-                height: 80px;
-                border-radius: 50%;
-                background: rgba(255, 255, 255, 0.03);
+            .desktop-only {
+                display: none !important;
+            }
+            
+            .launcher-card {
+                cursor: pointer;
+                transition: transform 0.3s ease, border-color 0.3s ease;
                 border: 1px solid rgba(255, 255, 255, 0.08);
-                display: flex;
-                align-items: center;
-                justify-content: center;
+            }
+            .launcher-card:hover {
+                transform: translateY(-4px);
+                border-color: rgba(99, 102, 241, 0.4) !important;
+                box-shadow: 0 10px 25px rgba(99, 102, 241, 0.15);
+            }
+            .launcher-card:hover .mic-circle {
+                background: rgba(124, 77, 255, 0.2) !important;
+                transform: scale(1.05);
+                box-shadow: 0 0 25px rgba(99, 102, 241, 0.5) !important;
+            }
+
+            .voice-avatar {
+                display: none !important;
             }
             
             .voice-avatar i {
@@ -822,6 +834,7 @@
         }
 
         /* Mobile Mode Class Rules */
+        body.mobile-mode .desktop-only { display: none !important; }
         body.mobile-mode .mobile-menu-btn { display: none !important; }
         body.mobile-mode .sidebar-overlay { display: none !important; }
         body.mobile-mode aside#sidebar { display: none !important; }
@@ -872,8 +885,8 @@
             padding: 10px 0 !important; 
         }
 
-        body.mobile-mode .voice-avatar { position: relative; width: 80px; height: 80px; border-radius: 50%; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); display: flex; align-items: center; justify-content: center; }
-        body.mobile-mode .voice-avatar i { font-size: 40px; color: var(--accent); }
+        body.mobile-mode .voice-avatar { display: none !important; }
+        body.mobile-mode .voice-avatar i { display: none !important; }
         body.mobile-mode .voice-status { font-family: 'Outfit', sans-serif; font-size: 18px; font-weight: 500; color: #fff; }
         body.mobile-mode .voice-transcription { font-size: 14px; color: var(--text-muted); line-height: 1.5; min-height: 50px; padding: 10px; border-radius: 12px; background: rgba(255, 255, 255, 0.02); width: 100%; box-sizing: border-box; font-style: italic; }
         body.mobile-mode #playground-mic-btn.recording { background: var(--danger) !important; box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7) !important; animation: pulse-ring-mic 1.5s infinite !important; }
@@ -1744,13 +1757,25 @@
                         </div>
 
                         <!-- Graph consistency card -->
-                        <div class="card glass" style="padding: 20px;">
+                        <div class="card glass desktop-only" style="padding: 20px;">
                             <div class="card-header">
                                 <div class="card-title"><i class="ph ph-chart-line-up" style="color:var(--primary);"></i> Consistencia Acumulada (Efecto Compuesto)</div>
                             </div>
                             <div style="padding:10px; height: 250px; position:relative;">
                                 <canvas id="chartSlightEdgeHistory"></canvas>
                             </div>
+                        </div>
+
+                        <!-- Launcher de voz con Coach IA para móviles (Visible solo en móvil) -->
+                        <div class="card glass mobile-only launcher-card" style="padding: 25px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 15px; justify-content: center; min-height: 250px; cursor: pointer; border: 1px solid rgba(255, 255, 255, 0.08);" onclick="showAppView('playground')">
+                            <div class="mic-circle" style="background: rgba(124, 77, 255, 0.1); width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 1px solid var(--primary); box-shadow: 0 0 20px rgba(99, 102, 241, 0.3); transition: all 0.3s ease;">
+                                <i class="ph ph-microphone" style="font-size: 36px; color: var(--accent);"></i>
+                            </div>
+                            <h3 style="font-size: 20px; font-family: 'Outfit'; color: white; margin: 5px 0 0 0; font-weight: 600;">¿Listo para planificar tu día?</h3>
+                            <p style="color: var(--text-muted); font-size: 13px; max-width: 280px; line-height: 1.5; margin: 0;">Habla con tu Coach IA para agendar citas, consultar tus tareas pendientes o actualizar tus avances.</p>
+                            <button class="btn btn-primary" style="background: linear-gradient(135deg, var(--primary), var(--secondary)); border: none; padding: 12px 24px; font-weight: 600; width: 100%; border-radius: 12px; color: white; display: flex; align-items: center; justify-content: center; gap: 8px; font-family: 'Outfit'; font-size: 15px; box-shadow: 0 4px 15px rgba(99, 102, 241, 0.2);">
+                                <i class="ph ph-sparkle"></i> Iniciar Sesión de Voz
+                            </button>
                         </div>
                     </div>
                     
