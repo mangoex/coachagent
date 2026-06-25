@@ -834,14 +834,44 @@
         body.mobile-mode main.content-area { padding-bottom: 85px !important; }
         body.mobile-mode #view-playground .page-header { display: none !important; }
         body.mobile-mode #view-playground .chat-header { display: none !important; }
-        body.mobile-mode #view-playground #chatMsgs { display: none !important; }
-        body.mobile-mode #view-playground #chatText { display: none !important; }
-        body.mobile-mode #view-playground .btn-send { display: none !important; }
-        body.mobile-mode #view-playground .chat-container { background: transparent !important; border: none !important; height: calc(100vh - 220px) !important; display: flex !important; flex-direction: column !important; justify-content: space-between !important; align-items: center !important; padding: 20px 10px !important; }
-        body.mobile-mode #view-playground .chat-input-area { border: none !important; background: transparent !important; display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; gap: 15px !important; width: 100% !important; padding: 20px 0 !important; }
-        body.mobile-mode #playground-mic-btn { display: flex !important; width: 110px !important; height: 110px !important; font-size: 40px !important; background: linear-gradient(135deg, var(--primary), var(--secondary)) !important; border: none !important; box-shadow: 0 8px 30px rgba(99, 102, 241, 0.4) !important; order: 1; }
-        body.mobile-mode #playground-audio-btn { display: flex !important; order: 2; font-size: 20px !important; color: var(--text-muted); }
-        body.mobile-mode .mobile-voice-feedback { display: flex !important; flex-direction: column; align-items: center; justify-content: center; text-align: center; flex: 1; gap: 24px; width: 100%; max-width: 320px; margin: auto; }
+
+        /* Conditional styling for VOICE MODE on mobile */
+        body.mobile-mode #view-playground.voice-mode #chatMsgs { display: none !important; }
+        body.mobile-mode #view-playground.voice-mode #chatText { display: none !important; }
+        body.mobile-mode #view-playground.voice-mode .btn-send { display: none !important; }
+        body.mobile-mode #view-playground.voice-mode .chat-container { background: transparent !important; border: none !important; height: calc(100vh - 220px) !important; display: flex !important; flex-direction: column !important; justify-content: space-between !important; align-items: center !important; padding: 20px 10px !important; }
+        body.mobile-mode #view-playground.voice-mode .chat-input-area { border: none !important; background: transparent !important; display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; gap: 15px !important; width: 100% !important; padding: 20px 0 !important; }
+        body.mobile-mode #view-playground.voice-mode #playground-mic-btn { display: flex !important; width: 110px !important; height: 110px !important; font-size: 40px !important; background: linear-gradient(135deg, var(--primary), var(--secondary)) !important; border: none !important; box-shadow: 0 8px 30px rgba(99, 102, 241, 0.4) !important; order: 1; }
+        body.mobile-mode #view-playground.voice-mode #playground-audio-btn { display: flex !important; order: 2; font-size: 20px !important; color: var(--text-muted); }
+        body.mobile-mode #view-playground.voice-mode .mobile-voice-feedback { display: flex !important; flex-direction: column; align-items: center; justify-content: center; text-align: center; flex: 1; gap: 24px; width: 100%; max-width: 320px; margin: auto; }
+
+        /* Conditional styling for KEYBOARD MODE on mobile */
+        body.mobile-mode #view-playground.keyboard-mode .mobile-voice-feedback { display: none !important; }
+        body.mobile-mode #view-playground.keyboard-mode #playground-mic-btn { display: none !important; }
+        body.mobile-mode #view-playground.keyboard-mode #chatMsgs { 
+            display: flex !important; 
+            flex-direction: column !important;
+            flex: 1 !important; 
+            height: auto !important; 
+            max-height: calc(100vh - 280px) !important;
+            overflow-y: auto !important;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 12px;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        body.mobile-mode #view-playground.keyboard-mode #chatText { display: block !important; }
+        body.mobile-mode #view-playground.keyboard-mode .btn-send { display: block !important; }
+        body.mobile-mode #view-playground.keyboard-mode .chat-input-area { 
+            display: flex !important; 
+            flex-direction: row !important;
+            align-items: center !important; 
+            justify-content: space-between !important; 
+            width: 100% !important; 
+            gap: 8px !important;
+            padding: 10px 0 !important; 
+        }
+
         body.mobile-mode .voice-avatar { position: relative; width: 80px; height: 80px; border-radius: 50%; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); display: flex; align-items: center; justify-content: center; }
         body.mobile-mode .voice-avatar i { font-size: 40px; color: var(--accent); }
         body.mobile-mode .voice-status { font-family: 'Outfit', sans-serif; font-size: 18px; font-weight: 500; color: #fff; }
@@ -1085,7 +1115,7 @@
             </div>
 
             <!-- VIEW: PLAYGROUND -->
-            <div id="view-playground" class="view-panel">
+            <div id="view-playground" class="view-panel voice-mode">
                 <div class="page-header" style="margin-bottom: 20px;">
                     <div>
                         <h2>Playground</h2>
@@ -1123,6 +1153,9 @@
                     </div>
                     
                     <div class="chat-input-area" style="display:flex; align-items:center; gap:8px;">
+                        <button class="btn-audio-control voice-only-mobile" id="playground-mode-toggle-btn" onclick="togglePlaygroundMode()" title="Cambiar entre voz y teclado" style="margin-right: 5px;">
+                            <i class="ph ph-keyboard" id="playground-mode-toggle-icon"></i>
+                        </button>
                         <button class="btn-audio-control voice-only-mobile active" id="playground-audio-btn" onclick="toggleAudioOutput()" title="Activar/Desactivar lectura en voz alta">
                             <i class="ph ph-speaker-high" id="playground-audio-icon"></i>
                         </button>
@@ -2355,6 +2388,30 @@
         let isPlaygroundListening = false;
         let isAdvantageListening = false;
 
+        function togglePlaygroundMode() {
+            const playground = document.getElementById('view-playground');
+            if (!playground) return;
+            
+            const isVoice = playground.classList.contains('voice-mode');
+            const toggleIcon = document.getElementById('playground-mode-toggle-icon');
+            
+            if (isVoice) {
+                playground.classList.remove('voice-mode');
+                playground.classList.add('keyboard-mode');
+                if (toggleIcon) {
+                    toggleIcon.className = 'ph ph-microphone-stage';
+                }
+                const chatMsgs = document.getElementById('chatMsgs');
+                if (chatMsgs) chatMsgs.scrollTop = chatMsgs.scrollHeight;
+            } else {
+                playground.classList.remove('keyboard-mode');
+                playground.classList.add('voice-mode');
+                if (toggleIcon) {
+                    toggleIcon.className = 'ph ph-keyboard';
+                }
+            }
+        }
+
         function toggleAudioOutput() {
             voiceMuted = !voiceMuted;
             const btn = document.getElementById('playground-audio-btn');
@@ -2379,12 +2436,32 @@
             
             const utterance = new SpeechSynthesisUtterance(cleaned);
             utterance.lang = 'es-MX';
+            
+            // When TTS ends, if in mobile voice-mode, automatically start recording again
+            utterance.onend = () => {
+                const playground = document.getElementById('view-playground');
+                const isVoiceMode = playground ? playground.classList.contains('voice-mode') : false;
+                if (isMobileDevice() && isVoiceMode && !voiceMuted) {
+                    setTimeout(() => {
+                        if (!isPlaygroundListening) {
+                            togglePlaygroundVoiceCapture();
+                        }
+                    }, 600); // slight delay to prevent device echo
+                }
+            };
+
             window.speechSynthesis.speak(utterance);
         }
 
         function initPlaygroundSpeech() {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (!SpeechRecognition) return;
+            if (!SpeechRecognition) {
+                const statusEl = document.getElementById('mobile-voice-status');
+                if (statusEl) statusEl.textContent = "Navegador no compatible";
+                const transEl = document.getElementById('mobile-voice-transcription');
+                if (transEl) transEl.textContent = "Tu navegador no soporta control por voz. Por favor usa el botón de teclado arriba para escribir, o abre la app en Safari (iOS) / Chrome (Android).";
+                return;
+            }
             
             playgroundRecognition = new SpeechRecognition();
             playgroundRecognition.continuous = false;
