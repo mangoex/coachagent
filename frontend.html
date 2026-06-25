@@ -543,6 +543,79 @@
             background-color: #0b0914; /* contrast dark color on active state */
         }
 
+        /* Voice FAB & indicators for mobile only */
+        .voice-fab {
+            position: fixed;
+            bottom: 25px;
+            right: 25px;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: var(--primary);
+            border: none;
+            color: white;
+            font-size: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 15px rgba(124, 77, 255, 0.4);
+            cursor: pointer;
+            z-index: 9999;
+            transition: var(--transition);
+        }
+        .voice-fab.recording {
+            background: var(--danger);
+            animation: pulse-ring 1.5s infinite;
+        }
+        .btn-voice-chat {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 18px;
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        .btn-voice-chat.recording {
+            background: var(--danger);
+            color: white;
+            box-shadow: 0 0 10px rgba(255, 77, 77, 0.5);
+        }
+        .btn-audio-control {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-size: 18px;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        .btn-audio-control.active {
+            color: var(--accent);
+        }
+
+        @keyframes pulse-ring {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 77, 77, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 15px rgba(255, 77, 77, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 77, 77, 0); }
+        }
+
+        /* Hide voice controls on desktop */
+        @media (min-width: 769px) {
+            .voice-only-mobile {
+                display: none !important;
+            }
+        }
+
     </style>
 </head>
 <body>
@@ -804,8 +877,14 @@
                         </div>
                     </div>
                     
-                    <div class="chat-input-area">
+                    <div class="chat-input-area" style="display:flex; align-items:center; gap:8px;">
+                        <button class="btn-audio-control voice-only-mobile active" id="playground-audio-btn" onclick="toggleAudioOutput()" title="Activar/Desactivar lectura en voz alta">
+                            <i class="ph ph-speaker-high" id="playground-audio-icon"></i>
+                        </button>
                         <input type="text" id="chatText" style="flex:1;" placeholder="Escribe tu instrucción aquí..." onkeypress="if(event.key==='Enter') sendChat()">
+                        <button class="btn-voice-chat voice-only-mobile" id="playground-mic-btn" onclick="togglePlaygroundVoiceCapture()" title="Dictar por voz">
+                            <i class="ph ph-microphone"></i>
+                        </button>
                         <button class="btn-send" onclick="sendChat()"><i class="ph-fill ph-paper-plane-right"></i></button>
                     </div>
                 </div>
@@ -1396,6 +1475,11 @@
                             </div>
                         </div>
                     </div>
+                    
+                    <!-- Mobile floating voice button to log activities -->
+                    <button class="voice-fab voice-only-mobile" id="advantage-voice-btn" onclick="toggleAdvantageVoiceCapture()" title="Registrar avances por voz">
+                        <i class="ph ph-microphone"></i>
+                    </button>
                 </div>
             </div>
 
@@ -1948,6 +2032,7 @@
                     <div class="message-row agent">
                         <div class="message-bubble">${replyText.replace(/\n/g, '<br>')}</div>
                     </div>`;
+                speakText(replyText);
             } catch(e) {
                 const loader = document.getElementById(loadingId);
                 if(loader) loader.remove();
@@ -1957,6 +2042,234 @@
                     </div>`;
             }
             chatMsgs.scrollTop = chatMsgs.scrollHeight;
+        }
+
+        // Global variables for mobile voice state
+        let voiceMuted = false;
+        let playgroundRecognition = null;
+        let advantageRecognition = null;
+        let isPlaygroundListening = false;
+        let isAdvantageListening = false;
+
+        function toggleAudioOutput() {
+            voiceMuted = !voiceMuted;
+            const btn = document.getElementById('playground-audio-btn');
+            const icon = document.getElementById('playground-audio-icon');
+            if (voiceMuted) {
+                btn.classList.remove('active');
+                icon.className = 'ph ph-speaker-slash';
+                if (window.speechSynthesis) window.speechSynthesis.cancel();
+            } else {
+                btn.classList.add('active');
+                icon.className = 'ph ph-speaker-high';
+            }
+        }
+
+        function speakText(text) {
+            if (!window.speechSynthesis || voiceMuted) return;
+            window.speechSynthesis.cancel();
+            
+            // Clean markdown and HTML formatting
+            let cleaned = text.replace(/<[^>]*>/g, '').replace(/[\*\_]/g, '');
+            cleaned = cleaned.replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1');
+            
+            const utterance = new SpeechSynthesisUtterance(cleaned);
+            utterance.lang = 'es-MX';
+            window.speechSynthesis.speak(utterance);
+        }
+
+        function initPlaygroundSpeech() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) return;
+            
+            playgroundRecognition = new SpeechRecognition();
+            playgroundRecognition.continuous = false;
+            playgroundRecognition.lang = 'es-MX';
+            playgroundRecognition.interimResults = false;
+
+            playgroundRecognition.onstart = () => {
+                isPlaygroundListening = true;
+                const micBtn = document.getElementById('playground-mic-btn');
+                if (micBtn) {
+                    micBtn.classList.add('recording');
+                    micBtn.innerHTML = '<i class="ph ph-stop"></i>';
+                }
+                const inputEl = document.getElementById('chatText');
+                if (inputEl) inputEl.placeholder = "Escuchando...";
+            };
+
+            playgroundRecognition.onerror = (e) => {
+                console.error("Speech recognition error:", e.error);
+                isPlaygroundListening = false;
+                resetPlaygroundMicUI();
+            };
+
+            playgroundRecognition.onend = () => {
+                isPlaygroundListening = false;
+                resetPlaygroundMicUI();
+            };
+
+            playgroundRecognition.onresult = (event) => {
+                const text = event.results[0][0].transcript;
+                const inputEl = document.getElementById('chatText');
+                if (inputEl) {
+                    inputEl.value = text;
+                    sendChat(); // Auto-send
+                }
+            };
+        }
+
+        function resetPlaygroundMicUI() {
+            const micBtn = document.getElementById('playground-mic-btn');
+            if (micBtn) {
+                micBtn.classList.remove('recording');
+                micBtn.innerHTML = '<i class="ph ph-microphone"></i>';
+            }
+            const inputEl = document.getElementById('chatText');
+            if (inputEl) inputEl.placeholder = "Escribe tu instrucción aquí...";
+        }
+
+        function togglePlaygroundVoiceCapture() {
+            if (!playgroundRecognition) initPlaygroundSpeech();
+            if (!playgroundRecognition) {
+                alert("Tu dispositivo no soporta reconocimiento de voz.");
+                return;
+            }
+
+            if (isPlaygroundListening) {
+                playgroundRecognition.stop();
+            } else {
+                if (window.speechSynthesis) window.speechSynthesis.cancel();
+                playgroundRecognition.start();
+            }
+        }
+
+        function initAdvantageSpeech() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) return;
+            
+            advantageRecognition = new SpeechRecognition();
+            advantageRecognition.continuous = false;
+            advantageRecognition.lang = 'es-MX';
+            advantageRecognition.interimResults = false;
+
+            advantageRecognition.onstart = () => {
+                isAdvantageListening = true;
+                const micBtn = document.getElementById('advantage-voice-btn');
+                if (micBtn) {
+                    micBtn.classList.add('recording');
+                    micBtn.innerHTML = '<i class="ph ph-stop"></i>';
+                }
+            };
+
+            advantageRecognition.onerror = (e) => {
+                console.error("Advantage recognition error:", e.error);
+                isAdvantageListening = false;
+                resetAdvantageMicUI();
+            };
+
+            advantageRecognition.onend = () => {
+                isAdvantageListening = false;
+                resetAdvantageMicUI();
+            };
+
+            advantageRecognition.onresult = async (event) => {
+                const text = event.results[0][0].transcript;
+                await sendAdvantageVoiceToAgent(text);
+            };
+        }
+
+        function resetAdvantageMicUI() {
+            const micBtn = document.getElementById('advantage-voice-btn');
+            if (micBtn) {
+                micBtn.classList.remove('recording');
+                micBtn.innerHTML = '<i class="ph ph-microphone"></i>';
+            }
+        }
+
+        function toggleAdvantageVoiceCapture() {
+            if (!advantageRecognition) initAdvantageSpeech();
+            if (!advantageRecognition) {
+                alert("Tu dispositivo no soporta reconocimiento de voz.");
+                return;
+            }
+
+            if (isAdvantageListening) {
+                advantageRecognition.stop();
+            } else {
+                if (window.speechSynthesis) window.speechSynthesis.cancel();
+                advantageRecognition.start();
+            }
+        }
+
+        async function sendAdvantageVoiceToAgent(text) {
+            const phone = window.sellerData?.phone_number;
+            if (!phone) {
+                alert("No pudimos obtener tu teléfono del perfil.");
+                return;
+            }
+
+            const micBtn = document.getElementById('advantage-voice-btn');
+            if (micBtn) {
+                micBtn.innerHTML = '<i class="ph ph-spinner ph-spin"></i>';
+                micBtn.disabled = true;
+            }
+
+            try {
+                const res = await fetch('/agent/chat', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        phone_number: phone,
+                        message: `[System: El usuario está dictando desde la vista La Ventaja] ${text}`
+                    })
+                });
+                const data = await res.json();
+                const replyText = data.reply || data.detail || "Ocurrió un error al procesar el audio.";
+                
+                speakText(replyText);
+                showVoiceFeedbackToast(replyText);
+                await loadAdvantageData();
+                
+            } catch (e) {
+                console.error("Error processing advantage voice command:", e);
+                showVoiceFeedbackToast("Error de conexión al procesar el audio.");
+            } finally {
+                if (micBtn) {
+                    micBtn.disabled = false;
+                    micBtn.innerHTML = '<i class="ph ph-microphone"></i>';
+                }
+            }
+        }
+
+        function showVoiceFeedbackToast(message) {
+            let toast = document.getElementById('voice-feedback-toast');
+            if (!toast) {
+                toast = document.createElement('div');
+                toast.id = 'voice-feedback-toast';
+                toast.style.position = 'fixed';
+                toast.style.bottom = '100px';
+                toast.style.left = '50%';
+                toast.style.transform = 'translateX(-50%)';
+                toast.style.background = 'rgba(15, 12, 32, 0.9)';
+                toast.style.border = '1px solid var(--accent)';
+                toast.style.color = 'white';
+                toast.style.padding = '12px 20px';
+                toast.style.borderRadius = '30px';
+                toast.style.fontSize = '13px';
+                toast.style.zIndex = '100000';
+                toast.style.boxShadow = '0 4px 15px rgba(0, 229, 255, 0.2)';
+                toast.style.transition = 'opacity 0.3s ease';
+                toast.style.maxWidth = '90%';
+                toast.style.textAlign = 'center';
+                document.body.appendChild(toast);
+            }
+            toast.innerText = message;
+            toast.style.opacity = '1';
+            
+            setTimeout(() => {
+                toast.style.opacity = '0';
+            }, 6000);
         }
 
         function handlePhotoUpload(event) {

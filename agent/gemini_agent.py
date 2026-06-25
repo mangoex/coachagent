@@ -51,7 +51,7 @@ class GeminiAgent:
                     "Cuando necesites agregar un nuevo cliente o prospecto al CRM, usa la herramienta add_crm_client.\n"
                     "Si el vendedor te informa que ha contactado, cotizado, vendido o cerrado una oportunidad con un cliente, actualiza su estado y notas en el CRM usando la herramienta update_crm_client.\n"
                     "Cuando se apruebe una cotización, usa la herramienta generate_quotation para generar la propuesta y devuélvele al vendedor el enlace firmado del PDF resultante.\n"
-                    "Tienes acceso a herramientas de accountability: si el vendedor te dice que hoy realizó llamadas, citas o propuestas, puedes usar la herramienta log_user_activities para registrarlas. También puedes usar get_user_accountability_progress para verificar cómo va el vendedor con respecto a sus metas diarias, semanales y mensuales y decírselo de forma motivadora y concisa.\n"
+                    "Tienes acceso a herramientas de accountability: si el vendedor te dice que hoy realizó llamadas, citas o propuestas, puedes usar la herramienta log_user_activities para registrarlas. También puedes usar get_user_accountability_progress para verificar cómo va el vendedor con respecto a sus metas diarias, semanales y mensuales y decírselo de forma motivadora y concisa. Además, para registrar avances y puntos en el plan de 'La Ventaja (The Slight Edge)', si el vendedor te menciona que completó disciplinas/actividades de su checklist de La Ventaja (como 'prospectar', 'hacer llamadas', 'cerrar ventas', etc.), utiliza la herramienta log_slight_edge_activities pasándole el nombre de la actividad y la cantidad en formato JSON.\n"
                     "Reglas de comunicación por WhatsApp: Cuando el vendedor te pida agendar una cita o tarea, usa las herramientas nativas (Calendar o Tasks). Para citas con clientes, usa create_calendar_event agregando su email en attendees para que le llegue confirmación automática por correo. Para recordatorios de seguimiento personal, usa create_google_task. Si el vendedor te pregunta por sus tareas pendientes, usa list_google_tasks para verlas, y si te pide marcar una tarea como realizada/completada, usa complete_google_task. En WhatsApp responde SIEMPRE de manera muy breve (ej: 'Listo, agendado en tu Calendar/Tasks' o 'Listo, tarea completada'). Evita enviar mensajes largos de confirmación.\n"
                     "Mantén un tono profesional, motivador, conciso y enfocado a objetivos comerciales. Responde en español.\n"
                 )
@@ -488,6 +488,125 @@ class GeminiAgent:
             finally:
                 db.close()
 
+        def log_slight_edge_activities(activities_json: str, date_str: str = "") -> str:
+            """
+            Registra o incrementa actividades completadas en el plan de 'La Ventaja (The Slight Edge)'.
+            Usa esta herramienta cuando el usuario te pida registrar actividades o disciplinas en 'La Ventaja'.
+            
+            Args:
+                activities_json: Un string JSON que representa un objeto/diccionario con el nombre de la actividad y la cantidad a sumar (ej: '{"Hacer llamadas": 2, "Prospectar": 1}').
+                date_str: Fecha opcional en formato 'YYYY-MM-DD'. Si está vacía, se asume hoy.
+            """
+            if not self.phone_number:
+                return "Error: No se dispone del número telefónico para registrar la actividad."
+            
+            import json
+            from database.connection import SessionLocal
+            from database.models import User, SlightEdgePlan, SlightEdgeLog
+            from datetime import datetime, date
+            import pytz
+
+            try:
+                activities_to_add = json.loads(activities_json)
+                if not isinstance(activities_to_add, dict):
+                    return "Error: activities_json debe representar un diccionario."
+            except Exception as e:
+                return f"Error: JSON de actividades inválido. Detalle: {str(e)}"
+
+            db = SessionLocal()
+            try:
+                user = db.query(User).filter(User.phone_number == self.phone_number).first()
+                if not user:
+                    return f"Error: No se encontró vendedor registrado con el teléfono {self.phone_number}."
+
+                plan = db.query(SlightEdgePlan).filter(SlightEdgePlan.user_id == user.id).first()
+                if not plan:
+                    return "Error: El usuario no tiene configurado un plan de La Ventaja."
+
+                cal_tz = "America/Mexico_City"
+                if self.refresh_token:
+                    try:
+                        metadata = GoogleCalendarService.get_calendar_metadata(self.refresh_token, self.calendar_id)
+                        cal_tz = metadata.get("timeZone", "America/Mexico_City")
+                    except Exception:
+                        pass
+                tz = pytz.timezone(cal_tz)
+                now_local = datetime.now(tz)
+
+                if date_str:
+                    try:
+                        target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+                    except ValueError:
+                        return "Error: Formato de fecha inválido. Usar YYYY-MM-DD."
+                else:
+                    target_date = now_local.date()
+
+                log = db.query(SlightEdgeLog).filter(
+                    SlightEdgeLog.user_id == user.id,
+                    SlightEdgeLog.date == target_date
+                ).first()
+
+                current_completed = {}
+                if log and log.completed_activities:
+                    if isinstance(log.completed_activities, str):
+                        try:
+                            current_completed = json.loads(log.completed_activities)
+                        except Exception:
+                            current_completed = {}
+                    elif isinstance(log.completed_activities, dict):
+                        current_completed = log.completed_activities
+
+                weights = {item["activity"]: item["points"] for item in plan.activities_config}
+
+                updated_activities = dict(current_completed)
+                for act_name, count in activities_to_add.items():
+                    matched_key = None
+                    for key in weights.keys():
+                        if key.lower().strip() == act_name.lower().strip():
+                            matched_key = key
+                            break
+                    
+                    if not matched_key:
+                        matched_key = act_name
+
+                    current_val = updated_activities.get(matched_key, 0)
+                    updated_activities[matched_key] = max(0, current_val + int(count))
+
+                total_points = 0
+                for act_name, count in updated_activities.items():
+                    weight = weights.get(act_name, 0)
+                    total_points += max(0, count) * weight
+
+                if not log:
+                    log = SlightEdgeLog(
+                        user_id=user.id,
+                        date=target_date,
+                        completed_activities=updated_activities,
+                        total_points=total_points
+                    )
+                    db.add(log)
+                else:
+                    log.completed_activities = updated_activities
+                    log.total_points = total_points
+
+                db.commit()
+
+                summary_lines = []
+                for act_name, count in activities_to_add.items():
+                    summary_lines.append(f"- {act_name}: +{count}")
+
+                return (
+                    f"¡Avance de La Ventaja registrado exitosamente para la fecha {target_date.isoformat()}!\n"
+                    "Actividades agregadas:\n" + "\n".join(summary_lines) + f"\n\nPuntos totales de hoy: {total_points}."
+                )
+
+            except Exception as e:
+                db.rollback()
+                logger.error(f"Error log_slight_edge_activities tool: {e}")
+                return f"Error registrando avance de La Ventaja: {str(e)}"
+            finally:
+                db.close()
+
         def get_user_accountability_progress() -> str:
             """
             Consulta el progreso actual de las metas y avance de actividades diarias, semanales y mensuales del vendedor.
@@ -623,6 +742,7 @@ class GeminiAgent:
             "schedule_followup": schedule_followup,
             "log_user_activities": log_user_activities,
             "get_user_accountability_progress": get_user_accountability_progress,
+            "log_slight_edge_activities": log_slight_edge_activities,
             "create_google_task": create_google_task,
             "list_google_tasks": list_google_tasks,
             "complete_google_task": complete_google_task
