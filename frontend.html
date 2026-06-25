@@ -1723,7 +1723,7 @@
                         </div>
 
                         <!-- Funnel Config Card -->
-                        <div class="card glass" style="padding: 20px;">
+                        <div class="card glass desktop-only" style="padding: 20px;">
                             <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
                                 <div class="card-title"><i class="ph ph-funnel" style="color:var(--accent);"></i> Tu Embudo de Ventas Estimado</div>
                                 <label class="switch-container">
@@ -1767,18 +1767,7 @@
                             </div>
                         </div>
 
-                        <!-- Launcher de voz con Coach IA para móviles (Visible solo en móvil) -->
-                        <div class="card glass mobile-only launcher-card" style="padding: 25px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 15px; justify-content: center; min-height: 250px; cursor: pointer; border: 1px solid rgba(255, 255, 255, 0.08);" onclick="showAppView('playground')">
-                            <div class="mic-circle" style="background: rgba(124, 77, 255, 0.1); width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 1px solid var(--primary); box-shadow: 0 0 20px rgba(99, 102, 241, 0.3); transition: all 0.3s ease;">
-                                <i class="ph ph-microphone" style="font-size: 36px; color: var(--accent);"></i>
-                            </div>
-                            <h3 style="font-size: 20px; font-family: 'Outfit'; color: white; margin: 5px 0 0 0; font-weight: 600;">¿Listo para planificar tu día?</h3>
-                            <p style="color: var(--text-muted); font-size: 13px; max-width: 280px; line-height: 1.5; margin: 0;">Habla con tu Coach IA para agendar citas, consultar tus tareas pendientes o actualizar tus avances.</p>
-                            <button class="btn btn-primary" style="background: linear-gradient(135deg, var(--primary), var(--secondary)); border: none; padding: 12px 24px; font-weight: 600; width: 100%; border-radius: 12px; color: white; display: flex; align-items: center; justify-content: center; gap: 8px; font-family: 'Outfit'; font-size: 15px; box-shadow: 0 4px 15px rgba(99, 102, 241, 0.2);">
-                                <i class="ph ph-sparkle"></i> Iniciar Sesión de Voz
-                            </button>
-                        </div>
-                    </div>
+
                     
                     <!-- Mobile floating voice button to log activities -->
                     <button class="voice-fab voice-only-mobile" id="advantage-voice-btn" onclick="toggleAdvantageVoiceCapture()" title="Registrar avances por voz">
