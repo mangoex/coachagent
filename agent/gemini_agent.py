@@ -51,7 +51,7 @@ class GeminiAgent:
                     "Cuando necesites agregar un nuevo cliente o prospecto al CRM, usa la herramienta add_crm_client.\n"
                     "Si el vendedor te informa que ha contactado, cotizado, vendido o cerrado una oportunidad con un cliente, actualiza su estado y notas en el CRM usando la herramienta update_crm_client.\n"
                     "Cuando se apruebe una cotización, usa la herramienta generate_quotation para generar la propuesta y devuélvele al vendedor el enlace firmado del PDF resultante.\n"
-                    "Tienes acceso a herramientas de accountability: si el vendedor te dice que hoy realizó llamadas, citas o propuestas, puedes usar la herramienta log_user_activities para registrarlas. También puedes usar get_user_accountability_progress para verificar cómo va el vendedor con respecto a sus metas diarias, semanales y mensuales y decírselo de forma motivadora y concisa. Además, para registrar avances y puntos en el plan de 'La Ventaja (The Slight Edge)', si el vendedor te menciona que completó disciplinas/actividades de su checklist de La Ventaja (como 'prospectar', 'hacer llamadas', 'cerrar ventas', etc.), utiliza la herramienta log_slight_edge_activities pasándole el nombre de la actividad y la cantidad en formato JSON.\n"
+                    "Tienes acceso a herramientas de accountability: si el vendedor te dice que hoy realizó llamadas, citas o propuestas, puedes usar la herramienta log_user_activities para registrarlas. También puedes usar get_user_accountability_progress para verificar cómo va el vendedor con respecto a sus metas diarias, semanales y mensuales. Además, para registrar avances y puntos en el plan de 'La Ventaja (The Slight Edge)', es fundamental que CADA VEZ que el vendedor te informe que tiene un nuevo prospecto, que hizo una nueva cita o reunión, que envió una cotización/propuesta, o que concretó una nueva venta/cierre, uses la herramienta log_slight_edge_activities para registrar y sumar esa actividad en su checklist de La Ventaja pasándole el nombre de la actividad (ej. 'Prospectar', 'Generar citas', 'Mandar cotizaciones', 'Cerrar', 'Cobrar', etc.) y la cantidad en formato JSON. Hazlo siempre proactivamente para actualizar su tablero diario de consistencia.\n"
                     "Reglas de comunicación por WhatsApp: Cuando el vendedor te pida agendar una cita o tarea, usa las herramientas nativas (Calendar o Tasks). Para citas con clientes, usa create_calendar_event agregando su email en attendees para que le llegue confirmación automática por correo. Para recordatorios de seguimiento personal, usa create_google_task. Si el vendedor te pregunta por sus tareas pendientes, usa list_google_tasks para verlas, y si te pide marcar una tarea como realizada/completada, usa complete_google_task. En WhatsApp responde SIEMPRE de manera muy breve (ej: 'Listo, agendado en tu Calendar/Tasks' o 'Listo, tarea completada'). Evita enviar mensajes largos de confirmación.\n"
                     "Mantén un tono profesional, motivador, conciso y enfocado a objetivos comerciales. Responde en español.\n"
                 )
@@ -561,11 +561,49 @@ class GeminiAgent:
                 updated_activities = dict(current_completed)
                 for act_name, count in activities_to_add.items():
                     matched_key = None
+                    act_name_clean = act_name.lower().strip()
+                    
+                    # 1. Exact match (case insensitive)
                     for key in weights.keys():
-                        if key.lower().strip() == act_name.lower().strip():
+                        if key.lower().strip() == act_name_clean:
                             matched_key = key
                             break
                     
+                    # 2. Substring matching (e.g. "llamadas" in "Hacer llamadas")
+                    if not matched_key:
+                        for key in weights.keys():
+                            key_clean = key.lower().strip()
+                            if act_name_clean in key_clean or key_clean in act_name_clean:
+                                matched_key = key
+                                break
+                                
+                    # 3. Semantic keyword mapping for common sales terms in Spanish
+                    if not matched_key:
+                        keywords_map = {
+                            "prospect": ["prospectar", "prospecto", "prospeccion", "prospectos"],
+                            "llamada": ["llamada", "llamadas", "llamar", "llamada telefónica"],
+                            "cita": ["cita", "citas", "reunion", "reuniones", "junta", "juntas", "agendar", "generar citas"],
+                            "cotiz": ["cotizacion", "cotizaciones", "cotizar", "propuesta", "propuestas", "presupuesto", "mandar cotizaciones"],
+                            "vent": ["venta", "ventas", "concretar", "cierre", "cerrar", "vend", "cerrar ventas"],
+                            "seguid": ["seguimiento", "seguir", "dar seguimiento"]
+                        }
+                        
+                        # Find matching category
+                        category = None
+                        for cat, terms in keywords_map.items():
+                            if any(t in act_name_clean for t in terms) or any(act_name_clean in t for t in terms):
+                                category = cat
+                                break
+                                
+                        if category:
+                            for key in weights.keys():
+                                key_clean = key.lower().strip()
+                                # Match if any term from the category is a substring of the plan's activity name
+                                if any(t in key_clean for t in keywords_map[category]):
+                                    matched_key = key
+                                    break
+                    
+                    # Fallback to the provided name if no match was found
                     if not matched_key:
                         matched_key = act_name
 
